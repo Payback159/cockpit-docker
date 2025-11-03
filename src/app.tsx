@@ -17,32 +17,49 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useEffect, useState } from 'react';
-import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import React, { useState } from 'react';
+import {
+    Page,
+    PageSection
+} from "@patternfly/react-core/dist/esm/components/Page/index.js";
+import {
+    Tabs,
+    Tab,
+    TabTitleText
+} from "@patternfly/react-core/dist/esm/components/Tabs/index.js";
 
 import cockpit from 'cockpit';
+import { DockerStatus } from './components/DockerStatus';
+import { ComposeProjects } from './components/ComposeProjects';
+import { ComposeContainers } from './components/ComposeContainers';
+import { ComposeImages } from './components/ComposeImages';
 
 const _ = cockpit.gettext;
 
 export const Application = () => {
-    const [hostname, setHostname] = useState(_("Unknown"));
-
-    useEffect(() => {
-        const hostname = cockpit.file('/etc/hostname');
-        hostname.watch(content => setHostname(content?.trim() ?? ""));
-        return hostname.close;
-    }, []);
+    const [activeTabKey, setActiveTabKey] = useState<string | number>(0);
 
     return (
-        <Card>
-            <CardTitle>Starter Kit</CardTitle>
-            <CardBody>
-                <Alert
-                    variant="info"
-                    title={ cockpit.format(_("Running on $0"), hostname) }
-                />
-            </CardBody>
-        </Card>
+        <Page className="no-masthead-sidebar">
+            <PageSection hasBodyWrapper={false}>
+                <Tabs
+                    activeKey={activeTabKey}
+                    onSelect={(_event, tabIndex) => setActiveTabKey(tabIndex)}
+                >
+                    <Tab eventKey={0} title={<TabTitleText>{_("Overview")}</TabTitleText>}>
+                        <DockerStatus />
+                    </Tab>
+                    <Tab eventKey={1} title={<TabTitleText>{_("Containers")}</TabTitleText>}>
+                        <ComposeContainers />
+                    </Tab>
+                    <Tab eventKey={2} title={<TabTitleText>{_("Compose Projects")}</TabTitleText>}>
+                        <ComposeProjects />
+                    </Tab>
+                    <Tab eventKey={3} title={<TabTitleText>{_("Images")}</TabTitleText>}>
+                        <ComposeImages />
+                    </Tab>
+                </Tabs>
+            </PageSection>
+        </Page>
     );
 };

@@ -3,3 +3,85 @@
 p {
     font-weight: bold;
 }
+
+// Remove default padding from Tabs and content to align with left edge like cockpit-machines
+.no-masthead-sidebar .pf-v6-c-tabs {
+    padding: 0;
+}
+
+.no-masthead-sidebar .pf-v6-c-tabs__list {
+    padding-left: 0;
+}
+
+.no-masthead-sidebar .pf-v6-c-tab-content {
+    padding: 0;
+}
+
+// Remove horizontal margins from all tab content
+.no-masthead-sidebar .pf-v6-c-tab-content > * {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+// Compose Projects Styling
+#compose-projects {
+    margin-top: var(--pf-v6-global--spacer--md);
+
+    .pf-v6-c-card__body.contains-list {
+        padding: 0;
+    }
+
+    // Better column widths for compose projects table
+    .pf-v6-c-table {
+        thead th:nth-child(1) { width: 20%; } // Name
+        thead th:nth-child(2) { width: 15%; } // Status
+        thead th:nth-child(3) { width: 50%; } // Config path
+        thead th:nth-child(4) { width: 15%; } // Actions
+    }
+
+    // Ensure action buttons are visible
+    .pf-v6-c-table__action {
+        text-align: right;
+        padding-right: var(--pf-v6-global--spacer--md);
+    }
+}
+
+// Compose Containers Styling - Group containers by project
+#compose-containers-notenschluessel,
+#compose-containers-nanonote,
+#compose-containers-whoogle,
+#compose-containers-stirling-pdf,
+#compose-containers-homarr,
+#compose-containers-gluetun,
+#compose-containers-recyclarr,
+#compose-containers-homepage,
+#compose-containers-authentik,
+[id^="compose-containers-"] {
+    margin-top: var(--pf-v6-global--spacer--md);
+
+    // Column widths for containers table
+    .pf-v6-c-table {
+        thead th:nth-child(1) { width: 15%; } // Service
+        thead th:nth-child(2) { width: 20%; } // Container Name
+        thead th:nth-child(3) { width: 25%; } // Image
+        thead th:nth-child(4) { width: 10%; } // Status
+        thead th:nth-child(5) { width: 15%; } // Ports
+        thead th:nth-child(6) { width: 15%; } // Actions
+    }
+}
+
+// Images Styling
+#compose-images {
+    margin-top: var(--pf-v6-global--spacer--md);
+
+    // Column widths for images table
+    .pf-v6-c-table {
+        thead th:nth-child(1) { width: 25%; } // Repository
+        thead th:nth-child(2) { width: 10%; } // Tag
+        thead th:nth-child(3) { width: 15%; } // Image ID
+        thead th:nth-child(4) { width: 10%; } // Size
+        thead th:nth-child(5) { width: 20%; } // Used By
+        thead th:nth-child(6) { width: 20%; } // Actions
+    }
+}
+

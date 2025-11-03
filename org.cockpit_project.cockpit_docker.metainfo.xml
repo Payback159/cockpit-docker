@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>org.cockpit_project.cockpit_docker</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>Docker</name>
+  <summary>Manage Docker and Docker Compose</summary>
+  <description>
+    <p>
+      Cockpit module for managing Docker containers and Docker Compose projects.
+
+      Provides a modern web interface to interact with Docker and orchestrate
+      multi-container applications using Docker Compose.
+    </p>
+  </description>
+  <extends>org.cockpit_project.cockpit</extends>
+  <launchable type="cockpit-manifest">cockpit-docker</launchable>
+  <url type="homepage">https://github.com/Payback159/cockpit-docker</url>
+  <url type="bugtracker">https://github.com/Payback159/cockpit-docker/issues</url>
+  <update_contact>cockpit-devel_AT_lists.fedorahosted.org</update_contact>
+  <developer id="org.cockpit-project">
+    <name>Cockpit Project</name>
+  </developer>
+</component>

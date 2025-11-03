@@ -1,8 +1,8 @@
-# starter-kit German translations
+# cockpit-docker German translations
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: starter-kit 1.0\n"
+"Project-Id-Version: cockpit-docker 1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-03-09 16:09+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -15,24 +15,24 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1\n"
 
 #: src/index.html:20
-msgid "Cockpit Starter Kit"
-msgstr "Cockpit Bausatz"
+msgid "Cockpit Docker"
+msgstr "Cockpit Docker"
 
 #: src/app.jsx:43
 msgid "Running on $0"
 msgstr "Läuft auf $0"
 
-#: org.cockpit-project.starter-kit.metainfo.xml:6
-msgid "Scaffolding for a cockpit module"
-msgstr "Gerüst für ein Cockpit-Modul"
+#: org.cockpit-project.cockpit-docker.metainfo.xml:6
+msgid "Manage Docker and Docker Compose"
+msgstr "Docker und Docker Compose verwalten"
 
-#: org.cockpit-project.starter-kit.metainfo.xml:8
-msgid "Scaffolding for a cockpit module."
-msgstr "Gerüst für ein Cockpit-Modul."
+#: org.cockpit-project.cockpit-docker.metainfo.xml:8
+msgid "Cockpit module for managing Docker containers and Docker Compose projects."
+msgstr "Cockpit-Modul zur Verwaltung von Docker-Containern und Docker Compose-Projekten."
 
-#: src/manifest.json:0 org.cockpit-project.starter-kit.metainfo.xml:5
-msgid "Starter Kit"
-msgstr "Bausatz"
+#: src/manifest.json:0 org.cockpit-project.cockpit-docker.metainfo.xml:5
+msgid "Docker"
+msgstr "Docker"
 
 #: src/app.jsx:29
 msgid "Unknown"

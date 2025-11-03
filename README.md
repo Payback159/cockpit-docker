@@ -1,6 +1,8 @@
-# Cockpit Starter Kit
+# Cockpit Docker
 
-Scaffolding for a [Cockpit](https://cockpit-project.org/) module.
+A [Cockpit](https://cockpit-project.org/) module for managing Docker and Docker Compose.
+
+This project provides a modern web interface for managing Docker containers and Docker Compose projects through Cockpit.
 
 # Development dependencies
 
@@ -18,8 +20,8 @@ On Fedora:
 These commands check out the source and build it into the `dist/` directory:
 
 ```
-git clone https://github.com/cockpit-project/starter-kit.git
-cd starter-kit
+git clone https://github.com/Payback159/cockpit-docker.git
+cd cockpit-docker
 make
 ```
 
@@ -39,7 +41,7 @@ this manually:
 
 ```
 mkdir -p ~/.local/share/cockpit
-ln -s `pwd`/dist ~/.local/share/cockpit/starter-kit
+ln -s `pwd`/dist ~/.local/share/cockpit/cockpit-docker
 ```
 
 After changing the code and running `make` again, reload the Cockpit page in
@@ -70,11 +72,11 @@ set to upload code changes to `~/.local/share/cockpit/` instead of
 To "uninstall" the locally installed version, run `make devel-uninstall`, or
 remove manually the symlink:
 
-    rm ~/.local/share/cockpit/starter-kit
+    rm ~/.local/share/cockpit/cockpit-docker
 
 # Running eslint
 
-Cockpit Starter Kit uses [ESLint](https://eslint.org/) to automatically check
+Cockpit Docker uses [ESLint](https://eslint.org/) to automatically check
 JavaScript/TypeScript code style in `.js[x]` and `.ts[x]` files.
 
 eslint is executed as part of `test/static-code`, aka. `make codecheck`.

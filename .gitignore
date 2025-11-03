@@ -19,7 +19,9 @@
 /cockpit-*.spec
 /cockpit-*.tar.xz
 /cockpit-navigator.spec
+/deploy.sh
 /dist/
+/Makefile.deploy
 /package-lock.json
 /pkg/
 /node_modules/

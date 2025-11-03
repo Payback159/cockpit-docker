@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: cockpit-docker 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-09 16:09+0100\n"
+"POT-Creation-Date: 2025-11-04 00:37+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -14,26 +14,465 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1\n"
 
+#: src/components/VolumeManagement.tsx:84
+msgid "${volumeName}"
+msgstr "${volumeName}"
+
+#: src/components/ComposeImages.tsx:268
+#: src/components/ComposeContainers.tsx:222
+#: src/components/ComposeProjects.tsx:182
+#: src/components/VolumeManagement.tsx:181
+msgid "Actions"
+msgstr "Aktionen"
+
+#: src/components/ComposeProjects.tsx:107
+msgid "Are you sure you want to remove all containers for this project?"
+msgstr "Sind Sie sicher, dass Sie alle Container für dieses Projekt entfernen möchten?"
+
+#: src/components/VolumeManagement.tsx:101
+msgid ""
+"Are you sure you want to remove all unused volumes? This action cannot be "
+"undone."
+msgstr ""
+"Sind Sie sicher, dass Sie alle ungenutzten Volumes entfernen möchten? Diese "
+"Aktion kann nicht rückgängig gemacht werden."
+
+#: src/components/DockerStatus.tsx:69
+msgid "Checking Docker installation..."
+msgstr "Prüfe Docker-Installation..."
+
+#: src/components/ComposeImages.tsx:315
+msgid "Cleaning up..."
+msgstr "Räume auf..."
+
+#: src/components/VolumeDetails.tsx:197 src/components/ContainerLogs.tsx:248
+#: src/components/ComposeFileViewer.tsx:193
+msgid "Close"
+msgstr "Schließen"
+
 #: src/index.html:20
 msgid "Cockpit Docker"
 msgstr "Cockpit Docker"
 
-#: src/app.jsx:43
-msgid "Running on $0"
-msgstr "Läuft auf $0"
+#: org.cockpit_project.cockpit_docker.metainfo.xml:21
+msgid "Cockpit Project"
+msgstr "Cockpit-Projekt"
 
-#: org.cockpit-project.cockpit-docker.metainfo.xml:6
-msgid "Manage Docker and Docker Compose"
-msgstr "Docker und Docker Compose verwalten"
+#: org.cockpit_project.cockpit_docker.metainfo.xml:8
+msgid ""
+"Cockpit module for managing Docker containers and Docker Compose projects. "
+"Provides a modern web interface to interact with Docker and orchestrate "
+"multi-container applications using Docker Compose."
+msgstr ""
+"Cockpit-Modul zur Verwaltung von Docker-Containern und Docker Compose-"
+"Projekten. Bietet eine moderne Weboberfläche zur Interaktion mit Docker und "
+"zur Orchestrierung von Multi-Container-Anwendungen mit Docker Compose."
 
-#: org.cockpit-project.cockpit-docker.metainfo.xml:8
-msgid "Cockpit module for managing Docker containers and Docker Compose projects."
-msgstr "Cockpit-Modul zur Verwaltung von Docker-Containern und Docker Compose-Projekten."
+#: src/app.tsx:57
+msgid "Compose Projects"
+msgstr "Compose-Projekte"
 
-#: src/manifest.json:0 org.cockpit-project.cockpit-docker.metainfo.xml:5
+#: src/components/ComposeProjects.tsx:181
+msgid "Config"
+msgstr "Konfiguration"
+
+#: src/components/PortMapping.tsx:211
+msgid "Container"
+msgstr "Container"
+
+#: src/components/ContainerLogs.tsx:174
+msgid "Container Logs: "
+msgstr "Container-Protokolle: "
+
+#: src/components/ComposeContainers.tsx:218
+msgid "Container Name"
+msgstr "Container-Name"
+
+#: src/components/PortMapping.tsx:208
+msgid "Container Port"
+msgstr "Container-Port"
+
+#: src/app.tsx:54
+msgid "Containers"
+msgstr "Container"
+
+#: src/components/VolumeDetails.tsx:149 src/components/VolumeManagement.tsx:180
+msgid "Created"
+msgstr "Erstellt"
+
+#: src/components/VolumeManagement.tsx:228
+msgid "Details"
+msgstr "Details"
+
+#: src/manifest.json:0 org.cockpit_project.cockpit_docker.metainfo.xml:5
 msgid "Docker"
 msgstr "Docker"
 
-#: src/app.jsx:29
-msgid "Unknown"
-msgstr "Unbekannt"
+#: src/components/DockerStatus.tsx:136
+msgid "Docker Compose"
+msgstr "Docker Compose"
+
+#: src/components/ComposeProjects.tsx:251
+#: src/components/ComposeProjects.tsx:257
+msgid "Docker Compose Projects"
+msgstr "Docker Compose-Projekte"
+
+#: src/components/DockerStatus.tsx:165
+msgid "Docker Compose not found"
+msgstr "Docker Compose nicht gefunden"
+
+#: src/components/DockerStatus.tsx:100
+msgid "Docker Engine"
+msgstr "Docker-Engine"
+
+#: src/components/DockerStatus.tsx:96
+msgid "Docker System Status"
+msgstr "Docker-Systemstatus"
+
+#: src/components/VolumeManagement.tsx:256
+#: src/components/VolumeManagement.tsx:276
+msgid "Docker Volumes"
+msgstr "Docker-Volumes"
+
+#: src/components/DockerStatus.tsx:184
+msgid ""
+"Docker needs to be installed on this system to use this module. Please "
+"install Docker Engine and Docker Compose plugin."
+msgstr ""
+"Docker muss auf diesem System installiert sein, um dieses Modul zu "
+"verwenden. Bitte installieren Sie Docker Engine und das Docker Compose-Plugin."
+
+#: src/components/DockerStatus.tsx:124
+msgid "Docker not found"
+msgstr "Docker nicht gefunden"
+
+#: src/components/ComposeProjects.tsx:238
+msgid "Down"
+msgstr "Herunterfahren"
+
+#: src/components/ContainerLogs.tsx:245
+#: src/components/ComposeFileViewer.tsx:190
+msgid "Download"
+msgstr "Herunterladen"
+
+#: src/components/VolumeDetails.tsx:128 src/components/VolumeManagement.tsx:176
+msgid "Driver"
+msgstr "Treiber"
+
+#: src/components/DockerStatus.tsx:79
+msgid "Error checking Docker"
+msgstr "Fehler beim Prüfen von Docker"
+
+#: src/components/ComposeFileViewer.tsx:144
+msgid "Error loading compose file"
+msgstr "Fehler beim Laden der Compose-Datei"
+
+#: src/components/ComposeContainers.tsx:183
+msgid "Error loading containers"
+msgstr "Fehler beim Laden der Container"
+
+#: src/components/ComposeImages.tsx:238
+msgid "Error loading images"
+msgstr "Fehler beim Laden der Images"
+
+#: src/components/ContainerLogs.tsx:110
+msgid "Error loading logs: "
+msgstr "Fehler beim Laden der Protokolle: "
+
+#: src/components/PortMapping.tsx:184
+msgid "Error loading port mappings"
+msgstr "Fehler beim Laden der Port-Zuordnungen"
+
+#: src/components/ComposeProjects.tsx:154
+msgid "Error loading projects"
+msgstr "Fehler beim Laden der Projekte"
+
+#: src/components/VolumeDetails.tsx:103
+msgid "Error loading volume details"
+msgstr "Fehler beim Laden der Volume-Details"
+
+#: src/components/VolumeManagement.tsx:152
+msgid "Error loading volumes"
+msgstr "Fehler beim Laden der Volumes"
+
+#: src/components/ContainerLogs.tsx:191
+msgid "Follow logs"
+msgstr "Protokollen folgen"
+
+#: src/components/ContainerLogs.tsx:191
+msgid "Following logs..."
+msgstr "Folge Protokollen..."
+
+#: src/components/PortMapping.tsx:210
+msgid "Host IP"
+msgstr "Host-IP"
+
+#: src/components/PortMapping.tsx:207
+msgid "Host Port"
+msgstr "Host-Port"
+
+#: src/components/ComposeContainers.tsx:219
+msgid "Image"
+msgstr "Image"
+
+#: src/components/ComposeImages.tsx:265
+msgid "Image ID"
+msgstr "Image-ID"
+
+#: src/app.tsx:60
+msgid "Images"
+msgstr "Images"
+
+#: src/components/DockerStatus.tsx:181
+msgid "Installation required"
+msgstr "Installation erforderlich"
+
+#: src/components/DockerStatus.tsx:106 src/components/DockerStatus.tsx:142
+msgid "Installed"
+msgstr "Installiert"
+
+#: src/components/VolumeDetails.tsx:157
+msgid "Labels"
+msgstr "Labels"
+
+#: src/components/ComposeProjects.tsx:146
+msgid "Loading Docker Compose projects..."
+msgstr "Lade Docker Compose-Projekte..."
+
+#: src/components/ComposeFileViewer.tsx:139
+msgid "Loading compose file..."
+msgstr "Lade Compose-Datei..."
+
+#: src/components/ContainerLogs.tsx:222
+msgid "Loading logs..."
+msgstr "Lade Protokolle..."
+
+#: src/components/PortMapping.tsx:176
+msgid "Loading port mappings..."
+msgstr "Lade Port-Zuordnungen..."
+
+#: src/components/VolumeDetails.tsx:98
+msgid "Loading volume details..."
+msgstr "Lade Volume-Details..."
+
+#: src/components/VolumeManagement.tsx:144
+msgid "Loading volumes..."
+msgstr "Lade Volumes..."
+
+#: src/components/VolumeManagement.tsx:134
+msgid "Local"
+msgstr "Lokal"
+
+#: src/components/ComposeContainers.tsx:281
+msgid "Logs"
+msgstr "Protokolle"
+
+#: org.cockpit_project.cockpit_docker.metainfo.xml:6
+msgid "Manage Docker and Docker Compose"
+msgstr "Docker und Docker Compose verwalten"
+
+#: src/components/VolumeDetails.tsx:142 src/components/VolumeManagement.tsx:178
+msgid "Mountpoint"
+msgstr "Einhängepunkt"
+
+#: src/components/VolumeDetails.tsx:121 src/components/ComposeProjects.tsx:179
+#: src/components/VolumeManagement.tsx:175
+msgid "Name"
+msgstr "Name"
+
+#: src/components/ComposeProjects.tsx:256
+msgid "No Docker Compose projects"
+msgstr "Keine Docker Compose-Projekte"
+
+#: src/components/ComposeProjects.tsx:166
+msgid "No Docker Compose projects found"
+msgstr "Keine Docker Compose-Projekte gefunden"
+
+#: src/components/ComposeImages.tsx:254
+msgid "No Docker images are available on this system."
+msgstr "Auf diesem System sind keine Docker-Images verfügbar."
+
+#: src/components/ComposeContainers.tsx:198
+msgid "No compose containers found"
+msgstr "Keine Compose-Container gefunden"
+
+#: src/components/ComposeContainers.tsx:199
+msgid ""
+"No containers from Docker Compose projects are currently running or exist."
+msgstr ""
+"Es laufen derzeit keine Container aus Docker Compose-Projekten oder sind "
+"vorhanden."
+
+#: src/components/ComposeImages.tsx:253
+msgid "No images found"
+msgstr "Keine Images gefunden"
+
+#: src/components/ContainerLogs.tsx:222
+msgid "No logs available"
+msgstr "Keine Protokolle verfügbar"
+
+#: src/components/PortMapping.tsx:236
+msgid "No port mappings"
+msgstr "Keine Port-Zuordnungen"
+
+#: src/components/PortMapping.tsx:196
+msgid "No port mappings found"
+msgstr "Keine Port-Zuordnungen gefunden"
+
+#: src/components/VolumeManagement.tsx:275
+msgid "No volumes"
+msgstr "Keine Volumes"
+
+#: src/components/VolumeManagement.tsx:164
+msgid "No volumes found"
+msgstr "Keine Volumes gefunden"
+
+#: src/components/DockerStatus.tsx:118 src/components/DockerStatus.tsx:159
+msgid "Not installed"
+msgstr "Nicht installiert"
+
+#: src/components/VolumeDetails.tsx:172
+msgid "Options"
+msgstr "Optionen"
+
+#: src/app.tsx:51
+msgid "Overview"
+msgstr "Übersicht"
+
+#: src/components/DockerStatus.tsx:151
+msgid "Plugin"
+msgstr "Plugin"
+
+#: src/components/PortMapping.tsx:231 src/components/PortMapping.tsx:237
+#: src/app.tsx:66
+msgid "Port Mappings"
+msgstr "Port-Zuordnungen"
+
+#: src/components/ComposeContainers.tsx:221
+msgid "Ports"
+msgstr "Ports"
+
+#: src/components/ComposeContainers.tsx:229 src/components/PortMapping.tsx:212
+#: src/components/VolumeManagement.tsx:179
+msgid "Project"
+msgstr "Projekt"
+
+#: src/components/PortMapping.tsx:209
+msgid "Protocol"
+msgstr "Protokoll"
+
+#: src/components/VolumeManagement.tsx:266
+msgid "Prune Unused"
+msgstr "Ungenutzte bereinigen"
+
+#: src/components/ComposeImages.tsx:301
+msgid "Pull Image"
+msgstr "Image laden"
+
+#: src/components/ComposeImages.tsx:282
+msgid "Pull new image (e.g., nginx:latest)"
+msgstr "Neues Image laden (z.B. nginx:latest)"
+
+#: src/components/ComposeImages.tsx:301
+msgid "Pulling..."
+msgstr "Lädt..."
+
+#: src/components/ComposeImages.tsx:354 src/components/VolumeManagement.tsx:239
+msgid "Remove"
+msgstr "Entfernen"
+
+#: src/components/ComposeImages.tsx:263
+msgid "Repository"
+msgstr "Repository"
+
+#: src/components/ComposeContainers.tsx:270
+#: src/components/ComposeProjects.tsx:227
+msgid "Restart"
+msgstr "Neustart"
+
+#: src/components/VolumeDetails.tsx:135 src/components/VolumeManagement.tsx:177
+msgid "Scope"
+msgstr "Bereich"
+
+#: src/components/ComposeContainers.tsx:217
+msgid "Service"
+msgstr "Dienst"
+
+#: src/components/ComposeImages.tsx:266
+msgid "Size"
+msgstr "Größe"
+
+#: src/components/ComposeContainers.tsx:256
+#: src/components/ComposeProjects.tsx:216
+msgid "Start"
+msgstr "Starten"
+
+#: src/components/ComposeProjects.tsx:170
+msgid "Start a project with 'docker compose up -d' to see it here."
+msgstr "Starten Sie ein Projekt mit 'docker compose up -d', um es hier zu sehen."
+
+#: src/components/PortMapping.tsx:213
+msgid "State"
+msgstr "Status"
+
+#: src/components/ComposeContainers.tsx:220
+#: src/components/ComposeProjects.tsx:180
+msgid "Status"
+msgstr "Status"
+
+#: src/components/ComposeContainers.tsx:256
+#: src/components/ComposeProjects.tsx:216
+msgid "Stop"
+msgstr "Stoppen"
+
+#: src/components/ComposeImages.tsx:264
+msgid "Tag"
+msgstr "Tag"
+
+#: src/components/ComposeProjects.tsx:168
+msgid "There are no Docker Compose projects running on this system."
+msgstr "Auf diesem System laufen keine Docker Compose-Projekte."
+
+#: src/components/VolumeManagement.tsx:166
+msgid "There are no Docker volumes on this system."
+msgstr "Auf diesem System gibt es keine Docker-Volumes."
+
+#: src/components/PortMapping.tsx:198
+msgid "There are no containers with exposed or mapped ports."
+msgstr "Es gibt keine Container mit exponierten oder zugeordneten Ports."
+
+#: src/components/ComposeImages.tsx:342
+msgid "Unused"
+msgstr "Ungenutzt"
+
+#: src/components/ComposeImages.tsx:267
+msgid "Used By"
+msgstr "Verwendet von"
+
+#: src/components/DockerStatus.tsx:110 src/components/DockerStatus.tsx:146
+msgid "Version"
+msgstr "Version"
+
+#: src/components/ComposeProjects.tsx:205
+msgid "View File"
+msgstr "Datei anzeigen"
+
+#: src/app.tsx:63
+msgid "Volumes"
+msgstr "Volumes"
+
+#: src/components/PortMapping.tsx:218
+msgid "not mapped"
+msgstr "nicht zugeordnet"
+
+#~ msgid "Running on $0"
+#~ msgstr "Läuft auf $0"
+
+#~ msgid ""
+#~ "Cockpit module for managing Docker containers and Docker Compose projects."
+#~ msgstr ""
+#~ "Cockpit-Modul zur Verwaltung von Docker-Containern und Docker Compose-"
+#~ "Projekten."
+
+#~ msgid "Unknown"
+#~ msgstr "Unbekannt"

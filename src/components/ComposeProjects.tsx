@@ -34,7 +34,13 @@ import {
 } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { CubesIcon } from '@patternfly/react-icons';
+import PlayIcon from '@patternfly/react-icons/dist/esm/icons/play-icon';
+import StopIcon from '@patternfly/react-icons/dist/esm/icons/stop-icon';
+import RedoIcon from '@patternfly/react-icons/dist/esm/icons/redo-icon';
+import TrashIcon from '@patternfly/react-icons/dist/esm/icons/trash-icon';
+import FileCodeIcon from '@patternfly/react-icons/dist/esm/icons/file-code-icon';
 
 import cockpit from 'cockpit';
 import { ListingTable } from 'cockpit-components-table.jsx';
@@ -43,8 +49,10 @@ import {
     startComposeProject,
     stopComposeProject,
     downComposeProject,
+    restartComposeProject,
     type ComposeProject
 } from '../docker';
+import { ComposeFileViewer } from './ComposeFileViewer';
 
 const _ = cockpit.gettext;
 
@@ -57,6 +65,7 @@ export const ComposeProjects: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [projects, setProjects] = useState<Map<string, ProjectWithServices>>(new Map());
     const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+    const [viewFileProject, setViewFileProject] = useState<{ name: string; path: string } | null>(null);
 
     const loadProjects = async () => {
         try {
@@ -92,8 +101,7 @@ export const ComposeProjects: React.FC = () => {
                 await stopComposeProject(projectName, configPath);
                 break;
             case 'restart':
-                await stopComposeProject(projectName, configPath);
-                await startComposeProject(projectName, configPath);
+                await restartComposeProject(projectName, configPath);
                 break;
             case 'down':
                 if (confirm(_("Are you sure you want to remove all containers for this project?"))) {
@@ -185,14 +193,52 @@ export const ComposeProjects: React.FC = () => {
                 { title: project.ConfigFiles },
                 {
                     title: (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            isDisabled={isActionInProgress}
-                            onClick={() => handleProjectAction(project.Name, project.ConfigFiles, isRunning ? 'stop' : 'start')}
-                        >
-                            {isRunning ? _("Stop") : _("Start")}
-                        </Button>
+                        <Flex spaceItems={{ default: 'spaceItemsSm' }}>
+                            <FlexItem>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<FileCodeIcon />}
+                                    isDisabled={isActionInProgress}
+                                    onClick={() => setViewFileProject({ name: project.Name, path: project.ConfigFiles })}
+                                >
+                                    {_("View File")}
+                                </Button>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    variant={isRunning ? "secondary" : "primary"}
+                                    size="sm"
+                                    icon={isRunning ? <StopIcon /> : <PlayIcon />}
+                                    isDisabled={isActionInProgress}
+                                    onClick={() => handleProjectAction(project.Name, project.ConfigFiles, isRunning ? 'stop' : 'start')}
+                                >
+                                    {isRunning ? _("Stop") : _("Start")}
+                                </Button>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<RedoIcon />}
+                                    isDisabled={isActionInProgress}
+                                    onClick={() => handleProjectAction(project.Name, project.ConfigFiles, 'restart')}
+                                >
+                                    {_("Restart")}
+                                </Button>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    icon={<TrashIcon />}
+                                    isDisabled={isActionInProgress}
+                                    onClick={() => handleProjectAction(project.Name, project.ConfigFiles, 'down')}
+                                >
+                                    {_("Down")}
+                                </Button>
+                            </FlexItem>
+                        </Flex>
                     )
                 }
             ],
@@ -213,6 +259,15 @@ export const ComposeProjects: React.FC = () => {
                     rows={rows}
                 />
             </CardBody>
+
+            {viewFileProject && (
+                <ComposeFileViewer
+                    isOpen={!!viewFileProject}
+                    onClose={() => setViewFileProject(null)}
+                    projectName={viewFileProject.name}
+                    configPath={viewFileProject.path}
+                />
+            )}
         </Card>
     );
 };

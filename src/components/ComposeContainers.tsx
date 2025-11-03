@@ -35,7 +35,10 @@ import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import PlayIcon from '@patternfly/react-icons/dist/esm/icons/play-icon';
 import StopIcon from '@patternfly/react-icons/dist/esm/icons/stop-icon';
+import RedoIcon from '@patternfly/react-icons/dist/esm/icons/redo-icon';
+import ListIcon from '@patternfly/react-icons/dist/esm/icons/list-icon';
 import { ListingTable } from "cockpit-components-table.jsx";
+import { ContainerLogs } from './ContainerLogs';
 
 const _ = cockpit.gettext;
 
@@ -54,6 +57,7 @@ export const ComposeContainers: React.FC = () => {
     const [containers, setContainers] = useState<Container[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [logsContainer, setLogsContainer] = useState<string | null>(null);
 
     const loadContainers = async () => {
         try {
@@ -122,9 +126,20 @@ export const ComposeContainers: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleContainerAction = async (containerName: string, action: 'start' | 'stop') => {
+    const handleContainerAction = async (containerName: string, action: 'start' | 'stop' | 'restart') => {
         try {
-            const command = action === 'start' ? 'start' : 'stop';
+            let command: string;
+            switch (action) {
+            case 'start':
+                command = 'start';
+                break;
+            case 'stop':
+                command = 'stop';
+                break;
+            case 'restart':
+                command = 'restart';
+                break;
+            }
             await cockpit.spawn(['docker', command, containerName], { err: 'message' });
             await loadContainers(); // Reload after action
         } catch (err) {
@@ -230,7 +245,7 @@ export const ComposeContainers: React.FC = () => {
                                                 <Flex spaceItems={{ default: 'spaceItemsSm' }}>
                                                     <FlexItem>
                                                         <Button
-                                                            variant="secondary"
+                                                            variant={isRunning ? "secondary" : "primary"}
                                                             size="sm"
                                                             icon={isRunning ? <StopIcon /> : <PlayIcon />}
                                                             onClick={() => handleContainerAction(
@@ -239,6 +254,31 @@ export const ComposeContainers: React.FC = () => {
                                                             )}
                                                         >
                                                             {isRunning ? _("Stop") : _("Start")}
+                                                        </Button>
+                                                    </FlexItem>
+                                                    {isRunning && (
+                                                        <FlexItem>
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                icon={<RedoIcon />}
+                                                                onClick={() => handleContainerAction(
+                                                                    container.Name,
+                                                                    'restart'
+                                                                )}
+                                                            >
+                                                                {_("Restart")}
+                                                            </Button>
+                                                        </FlexItem>
+                                                    )}
+                                                    <FlexItem>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            icon={<ListIcon />}
+                                                            onClick={() => setLogsContainer(container.Name)}
+                                                        >
+                                                            {_("Logs")}
                                                         </Button>
                                                     </FlexItem>
                                                 </Flex>
@@ -251,6 +291,13 @@ export const ComposeContainers: React.FC = () => {
                     </CardBody>
                 </Card>
             ))}
+            {logsContainer && (
+                <ContainerLogs
+                    containerName={logsContainer}
+                    isOpen={!!logsContainer}
+                    onClose={() => setLogsContainer(null)}
+                />
+            )}
         </>
     );
 };

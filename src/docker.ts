@@ -219,3 +219,139 @@ export async function downComposeProject(projectName: string, projectPath?: stri
         environ: projectPath ? [] : ['COMPOSE_PROJECT_NAME=' + projectName]
     });
 }
+
+/**
+ * Restart a Docker Compose project
+ */
+export async function restartComposeProject(projectName: string, projectPath?: string): Promise<void> {
+    const args = ['docker', 'compose'];
+    if (projectPath) {
+        args.push('-f', projectPath);
+    }
+    args.push('restart');
+
+    await cockpit.spawn(args, {
+        err: 'message',
+        environ: projectPath ? [] : ['COMPOSE_PROJECT_NAME=' + projectName]
+    });
+}
+
+/**
+ * Restart a single container
+ */
+export async function restartContainer(containerName: string): Promise<void> {
+    await cockpit.spawn(['docker', 'restart', containerName], { err: 'message' });
+}
+
+/**
+ * Read the content of a Docker Compose file
+ */
+export async function readComposeFile(filePath: string): Promise<string> {
+    const result = await cockpit.file(filePath).read();
+    return result || '';
+}
+
+/**
+ * Docker Volume Interface
+ */
+export interface DockerVolume {
+    Name: string;
+    Driver: string;
+    Mountpoint: string;
+    CreatedAt: string;
+    Labels: Record<string, string>;
+    Scope: string;
+    Options: Record<string, string> | null;
+}
+
+/**
+ * List all Docker volumes
+ */
+export async function listVolumes(): Promise<DockerVolume[]> {
+    try {
+        const result = await cockpit.spawn(
+            ['docker', 'volume', 'ls', '--format', 'json'],
+            { err: 'message' }
+        );
+
+        if (!result || result.trim() === '') {
+            return [];
+        }
+
+        // Parse NDJSON (newline-delimited JSON)
+        const lines = result.trim().split('\n');
+        const volumes: DockerVolume[] = lines.map(line => {
+            const vol = JSON.parse(line);
+            return {
+                Name: vol.Name || '',
+                Driver: vol.Driver || 'local',
+                Mountpoint: vol.Mountpoint || '',
+                CreatedAt: vol.CreatedAt || '',
+                Labels: vol.Labels || {},
+                Scope: vol.Scope || 'local',
+                Options: vol.Options || null
+            };
+        });
+
+        return volumes;
+    } catch (error) {
+        console.error('Failed to list volumes:', error);
+        return [];
+    }
+}
+
+/**
+ * Get detailed information about a specific volume
+ */
+export async function inspectVolume(volumeName: string): Promise<DockerVolume | null> {
+    try {
+        const result = await cockpit.spawn(
+            ['docker', 'volume', 'inspect', volumeName],
+            { err: 'message' }
+        );
+
+        const volumes = JSON.parse(result);
+        if (Array.isArray(volumes) && volumes.length > 0) {
+            const vol = volumes[0];
+            return {
+                Name: vol.Name || '',
+                Driver: vol.Driver || 'local',
+                Mountpoint: vol.Mountpoint || '',
+                CreatedAt: vol.CreatedAt || '',
+                Labels: vol.Labels || {},
+                Scope: vol.Scope || 'local',
+                Options: vol.Options || null
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Failed to inspect volume:', error);
+        return null;
+    }
+}
+
+/**
+ * Remove a Docker volume
+ */
+export async function removeVolume(volumeName: string, force: boolean = false): Promise<void> {
+    const args = ['docker', 'volume', 'rm'];
+    if (force) {
+        args.push('-f');
+    }
+    args.push(volumeName);
+    await cockpit.spawn(args, { err: 'message' });
+}
+
+/**
+ * Prune unused volumes
+ */
+export async function pruneVolumes(force: boolean = false): Promise<string> {
+    const args = ['docker', 'volume', 'prune'];
+    if (force) {
+        args.push('-f');
+    } else {
+        args.push('--force');
+    }
+    const result = await cockpit.spawn(args, { err: 'message' });
+    return result;
+}

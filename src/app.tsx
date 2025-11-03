@@ -33,6 +33,8 @@ import { DockerStatus } from './components/DockerStatus';
 import { ComposeProjects } from './components/ComposeProjects';
 import { ComposeContainers } from './components/ComposeContainers';
 import { ComposeImages } from './components/ComposeImages';
+import { PortMapping } from './components/PortMapping';
+import { VolumeManagement } from './components/VolumeManagement';
 
 const _ = cockpit.gettext;
 
@@ -57,6 +59,12 @@ export const Application = () => {
                     </Tab>
                     <Tab eventKey={3} title={<TabTitleText>{_("Images")}</TabTitleText>}>
                         <ComposeImages />
+                    </Tab>
+                    <Tab eventKey={4} title={<TabTitleText>{_("Volumes")}</TabTitleText>}>
+                        <VolumeManagement />
+                    </Tab>
+                    <Tab eventKey={5} title={<TabTitleText>{_("Port Mappings")}</TabTitleText>}>
+                        <PortMapping />
                     </Tab>
                 </Tabs>
             </PageSection>

@@ -37,6 +37,23 @@ export interface SystemInfo {
     compose: DockerComposeInfo;
 }
 
+export interface DockerSystemInfo {
+    Containers: number;
+    ContainersRunning: number;
+    ContainersPaused: number;
+    ContainersStopped: number;
+    Images: number;
+    Driver: string;
+    OperatingSystem: string;
+    KernelVersion: string;
+    NCPU: number;
+    MemTotal: number;
+    DockerRootDir: string;
+    LoggingDriver: string;
+    CgroupDriver: string;
+    CgroupVersion: string;
+}
+
 export interface ComposeProject {
     Name: string;
     Status: string;
@@ -129,6 +146,82 @@ export async function checkSystemInfo(): Promise<SystemInfo> {
     ]);
 
     return { docker, compose };
+}
+
+/**
+ * Get detailed Docker system information
+ */
+export async function getDockerInfo(): Promise<DockerSystemInfo | null> {
+    try {
+        const result = await cockpit.spawn(
+            ['docker', 'info', '--format', '{{json .}}'],
+            { err: 'message' }
+        );
+
+        const info = JSON.parse(result);
+        
+        return {
+            Containers: info.Containers || 0,
+            ContainersRunning: info.ContainersRunning || 0,
+            ContainersPaused: info.ContainersPaused || 0,
+            ContainersStopped: info.ContainersStopped || 0,
+            Images: info.Images || 0,
+            Driver: info.Driver || '',
+            OperatingSystem: info.OperatingSystem || '',
+            KernelVersion: info.KernelVersion || '',
+            NCPU: info.NCPU || 0,
+            MemTotal: info.MemTotal || 0,
+            DockerRootDir: info.DockerRootDir || '',
+            LoggingDriver: info.LoggingDriver || '',
+            CgroupDriver: info.CgroupDriver || '',
+            CgroupVersion: info.CgroupVersion || ''
+        };
+    } catch (error) {
+        console.error('Failed to get Docker info:', error);
+        return null;
+    }
+}
+
+/**
+ * Count Docker volumes
+ */
+export async function countVolumes(): Promise<number> {
+    try {
+        const result = await cockpit.spawn(
+            ['docker', 'volume', 'ls', '-q'],
+            { err: 'message' }
+        );
+        
+        if (!result || result.trim() === '') {
+            return 0;
+        }
+        
+        return result.trim().split('\n').length;
+    } catch (error) {
+        console.error('Failed to count volumes:', error);
+        return 0;
+    }
+}
+
+/**
+ * Count Docker networks
+ */
+export async function countNetworks(): Promise<number> {
+    try {
+        const result = await cockpit.spawn(
+            ['docker', 'network', 'ls', '-q'],
+            { err: 'message' }
+        );
+        
+        if (!result || result.trim() === '') {
+            return 0;
+        }
+        
+        return result.trim().split('\n').length;
+    } catch (error) {
+        console.error('Failed to count networks:', error);
+        return 0;
+    }
 }
 
 /**
@@ -269,8 +362,9 @@ export interface DockerVolume {
  */
 export async function listVolumes(): Promise<DockerVolume[]> {
     try {
+        // First get the list of volume names
         const result = await cockpit.spawn(
-            ['docker', 'volume', 'ls', '--format', 'json'],
+            ['docker', 'volume', 'ls', '--format', '{{.Name}}'],
             { err: 'message' }
         );
 
@@ -278,22 +372,15 @@ export async function listVolumes(): Promise<DockerVolume[]> {
             return [];
         }
 
-        // Parse NDJSON (newline-delimited JSON)
-        const lines = result.trim().split('\n');
-        const volumes: DockerVolume[] = lines.map(line => {
-            const vol = JSON.parse(line);
-            return {
-                Name: vol.Name || '',
-                Driver: vol.Driver || 'local',
-                Mountpoint: vol.Mountpoint || '',
-                CreatedAt: vol.CreatedAt || '',
-                Labels: vol.Labels || {},
-                Scope: vol.Scope || 'local',
-                Options: vol.Options || null
-            };
-        });
-
-        return volumes;
+        // Get volume names
+        const volumeNames = result.trim().split('\n');
+        
+        // Inspect all volumes to get full details
+        const inspectPromises = volumeNames.map(name => inspectVolume(name));
+        const inspectResults = await Promise.all(inspectPromises);
+        
+        // Filter out null results and return
+        return inspectResults.filter((vol): vol is DockerVolume => vol !== null);
     } catch (error) {
         console.error('Failed to list volumes:', error);
         return [];

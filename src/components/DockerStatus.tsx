@@ -42,6 +42,7 @@ import { CheckCircleIcon, ExclamationCircleIcon } from '@patternfly/react-icons'
 
 import cockpit from 'cockpit';
 import { checkSystemInfo, type SystemInfo } from '../docker';
+import { DockerResources } from './DockerResources';
 
 const _ = cockpit.gettext;
 
@@ -92,12 +93,15 @@ export const DockerStatus: React.FC = () => {
     const composeInstalled = systemInfo.compose.installed;
 
     return (
-        <Card>
-            <CardTitle>{_("Docker System Status")}</CardTitle>
-            <CardBody>
-                <DescriptionList isHorizontal>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("Docker Engine")}</DescriptionListTerm>
+        <>
+            {dockerInstalled && <DockerResources />}
+            
+            <Card>
+                <CardTitle>{_("Docker System Status")}</CardTitle>
+                <CardBody>
+                    <DescriptionList isHorizontal>
+                        <DescriptionListGroup>
+                            <DescriptionListTerm>{_("Docker Engine")}</DescriptionListTerm>
                         <DescriptionListDescription>
                             {dockerInstalled
                                 ? (
@@ -186,5 +190,6 @@ export const DockerStatus: React.FC = () => {
                 )}
             </CardBody>
         </Card>
+        </>
     );
 };

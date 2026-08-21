@@ -12,6 +12,8 @@ IMAGE=cockpit-docker-devenv
 VOL_DOCKER=${NAME}-docker
 VOL_CONTAINERD=${NAME}-containerd
 PORT=${DEVENV_PORT:-19090}
+SSH_PORT=${DEVENV_SSH_PORT:-12222}
+WITH_SSH=0
 BASE=ubuntu:26.04
 DOCKER_SOURCE=distro
 
@@ -31,6 +33,7 @@ while [ $# -gt 0 ]; do
     case $1 in
         --base)   BASE=${2:?--base braucht ein Argument}; shift 2 ;;
         --source) DOCKER_SOURCE=${2:?--source braucht ein Argument}; shift 2 ;;
+        --ssh)  WITH_SSH=1; shift ;;
         --)     shift; break ;;
         *)      break ;;
     esac
@@ -69,8 +72,11 @@ up)
     build
     # WICHTIG: keine --tmpfs- oder cgroup-Mounts (systemd stirbt sonst mit 255).
     # Zwei benannte Volumes, sonst overlay-auf-overlay beim Start von Containern.
+    ssh_opt=""
+    [ "$WITH_SSH" -eq 1 ] && ssh_opt="-p 127.0.0.1:$SSH_PORT:22"
+    # shellcheck disable=SC2086
     docker run -d --name "$NAME" --privileged \
-        -p "127.0.0.1:$PORT:9090" \
+        -p "127.0.0.1:$PORT:9090" $ssh_opt \
         -v "$VOL_DOCKER:/var/lib/docker" \
         -v "$VOL_CONTAINERD:/var/lib/containerd" \
         -v "$REPO_ROOT/dist:/usr/local/share/cockpit/cockpit-docker:ro" \
@@ -100,6 +106,27 @@ reset)
     running || { echo "Laeuft nicht - erst 'devenv up'" >&2; exit 1; }
     docker exec "$NAME" /srv/fixtures/load.sh --reset
     echo "Fixtures zurueckgesetzt"
+    ;;
+test)
+    key=${TMPDIR:-/tmp}/cockpit-docker-devenv-key
+    running || "$0" up --ssh
+    docker port "$NAME" 22 >/dev/null 2>&1 || {
+        echo "Container laeuft ohne SSH - erst 'devenv down', dann 'devenv test'" >&2
+        exit 1
+    }
+    rm -f "$key" "${key}.pub"
+    ssh-keygen -q -t ed25519 -N '' -f "$key"
+    docker exec -i "$NAME" sh -c \
+        'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
+        < "${key}.pub"
+    sshp=$(docker port "$NAME" 22 | cut -d: -f2)
+    echo "run-tests gegen 127.0.0.1:$sshp (ssh) und 127.0.0.1:$PORT (web)"
+    GIT_SSH_COMMAND="ssh -i $key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+    TEST_SSH_KEY="$key" \
+        "$REPO_ROOT/test/common/run-tests" \
+            --machine "127.0.0.1:$sshp" \
+            --browser "127.0.0.1:$PORT" \
+            "$@"
     ;;
 *)
     usage

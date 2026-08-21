@@ -19,7 +19,7 @@ RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
         systemd systemd-sysv dbus \
         cockpit-ws cockpit-bridge cockpit-system \
-        sudo iproute2 ca-certificates curl gnupg \
+        sudo iproute2 ca-certificates curl gnupg openssh-server \
     && if [ "$DOCKER_SOURCE" = "distro" ]; then \
            apt-get install -y -qq --no-install-recommends docker.io docker-cli \
            && (apt-get install -y -qq --no-install-recommends docker-compose-v2 \
@@ -57,7 +57,7 @@ RUN systemctl mask systemd-udevd systemd-udev-trigger systemd-modules-load \
         systemd-networkd-wait-online e2scrub_reap getty@tty1 \
         getty.target console-getty 2>/dev/null || true
 
-RUN systemctl enable cockpit.socket docker.service
+RUN systemctl enable cockpit.socket docker.service ssh
 
 STOPSIGNAL SIGRTMIN+3
 EXPOSE 9090

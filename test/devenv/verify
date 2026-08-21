@@ -245,13 +245,46 @@ verify_distros() {
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+verify_testmode() {
+    echo "== Betriebsart test =="
+    FAILED=0
+    DEVENV="$REPO_ROOT/test/devenv/devenv"
+    key=${TMPDIR:-/tmp}/devenv-verify-key-$$
+
+    "$DEVENV" down >/dev/null 2>&1 || true
+    "$DEVENV" up --ssh >/dev/null
+
+    check "sshd laeuft im Container" \
+        sh -c "docker exec cockpit-docker-devenv systemctl is-active ssh 2>/dev/null | grep -q '^active$' || docker exec cockpit-docker-devenv systemctl is-active sshd 2>/dev/null | grep -q '^active$'"
+    check "SSH-Port gebunden" \
+        sh -c "docker port cockpit-docker-devenv 22 | grep -q '^127.0.0.1:'"
+
+    ssh-keygen -q -t ed25519 -N '' -f "$key"
+    docker exec -i cockpit-docker-devenv sh -c \
+        'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
+        < "${key}.pub"
+
+    port=$(docker port cockpit-docker-devenv 22 | cut -d: -f2)
+    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+           -o ConnectTimeout=10 -i "$key" -p "$port" root@127.0.0.1 \
+           'echo verbunden' 2>/dev/null | grep -qx verbunden; then
+        pass "SSH-Verbindung von aussen moeglich"
+    else
+        fail "SSH-Verbindung von aussen nicht moeglich"
+    fi
+
+    rm -f "$key" "${key}.pub"
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
 case "${1:-all}" in
     image)     verify_image ;;
     lifecycle) verify_lifecycle ;;
     fixtures)  verify_fixtures ;;
     mount)     verify_mount ;;
     distros)   verify_distros ;;
-    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount && verify_distros ;;
+    testmode)  verify_testmode ;;
+    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount && verify_distros && verify_testmode ;;
     *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
 echo "alle Pruefungen bestanden"

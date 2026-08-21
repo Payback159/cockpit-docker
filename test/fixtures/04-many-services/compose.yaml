@@ -1,0 +1,19 @@
+# Fuenf Services: erzwingt mehrzeiliges NDJSON bei
+# "docker compose ps --format json". Ein JSON.parse ueber die Gesamtausgabe
+# scheitert ab dem zweiten Service.
+services:
+  one:
+    image: busybox
+    command: sleep infinity
+  two:
+    image: busybox
+    command: sleep infinity
+  three:
+    image: busybox
+    command: sleep infinity
+  four:
+    image: busybox
+    command: sleep infinity
+  five:
+    image: busybox
+    command: sleep infinity

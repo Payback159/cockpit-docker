@@ -1,0 +1,15 @@
+# Normalfall: zwei Services, ein Portmapping, ein benanntes Volume.
+services:
+  web:
+    image: busybox
+    command: sleep infinity
+    ports:
+      - "127.0.0.1:8080:80"
+  cache:
+    image: busybox
+    command: sleep infinity
+    volumes:
+      - simpledata:/data
+
+volumes:
+  simpledata:

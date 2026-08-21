@@ -113,10 +113,58 @@ verify_lifecycle() {
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+verify_fixtures() {
+    echo "== Fixtures =="
+    FAILED=0
+    DEVENV="$REPO_ROOT/test/devenv/devenv"
+    dex() { docker exec cockpit-docker-devenv "$@"; }
+
+    running=$(docker ps --filter "name=^cockpit-docker-devenv$" --format '{{.Names}}' || true)
+    [ -n "$running" ] || "$DEVENV" up >/dev/null
+
+    dex /srv/fixtures/load.sh >/dev/null
+    pass "load.sh laeuft durch"
+
+    for p in simple multifile stopped manyservices; do
+        check "Projekt $p existiert" \
+            sh -c "docker exec cockpit-docker-devenv docker compose ls --all --format json | grep -q '\"Name\":\"$p\"'"
+    done
+
+    # Kernfall: zwei kommagetrennte Pfade in ConfigFiles
+    cfg=$(dex docker compose ls --all --format json | tr ',' '\n' | grep -c '/srv/fixtures/02-multifile/' || true)
+    if [ "$cfg" -ge 2 ]; then
+        pass "multifile liefert zwei Pfade in ConfigFiles"
+    else
+        fail "multifile liefert nur $cfg Pfad(e) in ConfigFiles"
+    fi
+
+    # Kernfall: mehrzeiliges NDJSON
+    lines=$(dex sh -c 'cd /srv/fixtures/04-many-services && docker compose -p manyservices ps --format json' | wc -l)
+    if [ "$lines" -ge 5 ]; then
+        pass "manyservices liefert $lines NDJSON-Zeilen"
+    else
+        fail "manyservices liefert nur $lines Zeile(n), erwartet >= 5"
+    fi
+
+    check "stopped ist nicht running" \
+        sh -c "! docker exec cockpit-docker-devenv docker compose ls --all --format json | grep -o '\"Name\":\"stopped\",\"Status\":\"[^\"]*\"' | grep -q running"
+    check "Nicht-Compose-Container existiert" \
+        sh -c "docker exec cockpit-docker-devenv docker ps -a --format '{{.Names}}' | grep -qx standalone"
+    check "Nicht-Compose-Container hat kein Compose-Label" \
+        sh -c "! docker exec cockpit-docker-devenv docker ps -a --filter label=com.docker.compose.project --format '{{.Names}}' | grep -qx standalone"
+    check "verwaistes Volume existiert" \
+        sh -c "docker exec cockpit-docker-devenv docker volume ls -q | grep -qx orphan-data"
+
+    check "load.sh ist idempotent" dex /srv/fixtures/load.sh
+
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
 case "${1:-all}" in
     image)     verify_image ;;
     lifecycle) verify_lifecycle ;;
-    all)       verify_image && verify_lifecycle ;;
+    fixtures)  verify_fixtures ;;
+    all)       verify_image && verify_lifecycle && verify_fixtures ;;
     *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
 echo "alle Pruefungen bestanden"

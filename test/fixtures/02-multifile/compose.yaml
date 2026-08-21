@@ -1,0 +1,7 @@
+# Basisdatei. Zusammen mit compose.override.yaml erzeugt sie ein ConfigFiles
+# mit ZWEI kommagetrennten Pfaden -- der Fall, an dem ein
+# "-f <pfad,pfad>"-Aufruf scheitert.
+services:
+  app:
+    image: busybox
+    command: sleep infinity

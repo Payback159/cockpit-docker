@@ -1,0 +1,6 @@
+# Wird von load.sh gestartet und sofort wieder gestoppt, damit der
+# Zweig "Status exited / Start-Button statt Stop" abgedeckt ist.
+services:
+  worker:
+    image: busybox
+    command: sleep infinity

@@ -1,0 +1,107 @@
+#!/bin/sh
+# Lebenszyklus der Test- und Entwicklungsumgebung.
+#
+#   up     Container starten (baut das Image bei Bedarf), Fixtures laden
+#   down   Container UND beide Storage-Volumes entfernen
+#   shell  Shell im Container oeffnen
+#   reset  Fixtures zuruecksetzen, ohne neu zu bauen
+set -eu
+
+NAME=cockpit-docker-devenv
+IMAGE=cockpit-docker-devenv
+VOL_DOCKER=${NAME}-docker
+VOL_CONTAINERD=${NAME}-containerd
+PORT=${DEVENV_PORT:-19090}
+BASE=ubuntu:26.04
+DOCKER_SOURCE=distro
+
+REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+HERE=$REPO_ROOT/test/devenv
+
+usage() {
+    echo "Aufruf: devenv {up|down|shell|reset|test} [--base IMAGE] [--source distro|docker.com] [--ssh]" >&2
+    exit 2
+}
+
+cmd=${1:-}
+[ -n "$cmd" ] || usage
+shift || true
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --base)   BASE=${2:?--base braucht ein Argument}; shift 2 ;;
+        --source) DOCKER_SOURCE=${2:?--source braucht ein Argument}; shift 2 ;;
+        --)     shift; break ;;
+        *)      break ;;
+    esac
+done
+
+build() {
+    docker build -q --build-arg "BASE=$BASE" --build-arg "DOCKER_SOURCE=$DOCKER_SOURCE" \
+        -t "$IMAGE" -f "$HERE/Containerfile" "$HERE" >/dev/null
+}
+
+running() {
+    docker ps --filter "name=^${NAME}$" --format '{{.Names}}' | grep -qx "$NAME"
+}
+
+wait_ready() {
+    i=0
+    while [ "$i" -lt 40 ]; do
+        if docker exec "$NAME" systemctl is-active docker.service 2>/dev/null | grep -q '^active$'; then
+            return 0
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+    echo "docker.service im Container wurde nicht aktiv" >&2
+    docker logs "$NAME" >&2 2>&1 || true
+    return 1
+}
+
+case $cmd in
+up)
+    if running; then
+        echo "Laeuft bereits: http://127.0.0.1:$PORT"
+        exit 0
+    fi
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    build
+    # WICHTIG: keine --tmpfs- oder cgroup-Mounts (systemd stirbt sonst mit 255).
+    # Zwei benannte Volumes, sonst overlay-auf-overlay beim Start von Containern.
+    docker run -d --name "$NAME" --privileged \
+        -p "127.0.0.1:$PORT:9090" \
+        -v "$VOL_DOCKER:/var/lib/docker" \
+        -v "$VOL_CONTAINERD:/var/lib/containerd" \
+        -v "$REPO_ROOT/dist:/usr/local/share/cockpit/cockpit-docker:ro" \
+        -v "$REPO_ROOT/test/fixtures:/srv/fixtures:ro" \
+        "$IMAGE" >/dev/null
+    wait_ready
+    if [ -x "$REPO_ROOT/test/fixtures/load.sh" ]; then
+        docker exec "$NAME" /srv/fixtures/load.sh >/dev/null 2>&1 || \
+            echo "Hinweis: Fixtures konnten nicht geladen werden" >&2
+    fi
+    echo "Bereit: http://127.0.0.1:$PORT   (devel/devel oder admin/admin)"
+    ;;
+down)
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    docker volume rm "$VOL_DOCKER" "$VOL_CONTAINERD" >/dev/null 2>&1 || true
+    echo "Entfernt: Container und beide Volumes"
+    ;;
+shell)
+    running || { echo "Laeuft nicht - erst 'devenv up'" >&2; exit 1; }
+    if [ $# -gt 0 ]; then
+        docker exec "$NAME" sh "$@"
+    else
+        docker exec -it "$NAME" bash
+    fi
+    ;;
+reset)
+    running || { echo "Laeuft nicht - erst 'devenv up'" >&2; exit 1; }
+    docker exec "$NAME" /srv/fixtures/load.sh --reset
+    echo "Fixtures zurueckgesetzt"
+    ;;
+*)
+    usage
+    ;;
+esac

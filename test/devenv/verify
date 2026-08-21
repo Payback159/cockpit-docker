@@ -66,9 +66,54 @@ verify_image() {
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+verify_lifecycle() {
+    echo "== Lebenszyklus =="
+    FAILED=0
+    DEVENV="$REPO_ROOT/test/devenv/devenv"
+
+    "$DEVENV" down >/dev/null 2>&1 || true
+
+    "$DEVENV" up >/dev/null
+    pass "up laeuft durch"
+
+    check "Container laeuft" \
+        sh -c "docker ps --filter name=cockpit-docker-devenv --format '{{.Names}}' | grep -qx cockpit-docker-devenv"
+    check "Cockpit antwortet mit HTTP 200" \
+        sh -c "curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:19090/ | grep -qx 200"
+    check "Port nur auf 127.0.0.1 gebunden" \
+        sh -c "docker port cockpit-docker-devenv 9090 | grep -q '^127.0.0.1:'"
+    check "Volume /var/lib/docker vorhanden" \
+        sh -c "docker volume ls -q | grep -qx cockpit-docker-devenv-docker"
+    check "Volume /var/lib/containerd vorhanden" \
+        sh -c "docker volume ls -q | grep -qx cockpit-docker-devenv-containerd"
+
+    # Isolation: der Container darf die Volumes des Hosts nicht sehen.
+    host_vols=$(docker volume ls -q | wc -l)
+    cont_vols=$(docker exec cockpit-docker-devenv docker volume ls -q 2>/dev/null | wc -l)
+    if [ "$cont_vols" -lt "$host_vols" ]; then
+        pass "Isolation: Container sieht $cont_vols statt $host_vols Volumes"
+    else
+        fail "Isolation: Container sieht $cont_vols Volumes, Host hat $host_vols"
+    fi
+
+    check "up ist idempotent" "$DEVENV" up
+    check "shell funktioniert"  sh -c "$DEVENV shell -c 'echo ok' | grep -qx ok"
+
+    "$DEVENV" down >/dev/null
+    check "down entfernt Container" \
+        sh -c "! docker ps -a --format '{{.Names}}' | grep -qx cockpit-docker-devenv"
+    check "down entfernt Volume docker" \
+        sh -c "! docker volume ls -q | grep -qx cockpit-docker-devenv-docker"
+    check "down entfernt Volume containerd" \
+        sh -c "! docker volume ls -q | grep -qx cockpit-docker-devenv-containerd"
+
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
 case "${1:-all}" in
-    image) verify_image ;;
-    all)   verify_image ;;
-    *)     echo "Unbekannt: $1" >&2; exit 2 ;;
+    image)     verify_image ;;
+    lifecycle) verify_lifecycle ;;
+    all)       verify_image && verify_lifecycle ;;
+    *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
 echo "alle Pruefungen bestanden"

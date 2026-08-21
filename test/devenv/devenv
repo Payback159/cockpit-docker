@@ -108,13 +108,14 @@ reset)
     echo "Fixtures zurueckgesetzt"
     ;;
 test)
-    key=${TMPDIR:-/tmp}/cockpit-docker-devenv-key
     running || "$0" up --ssh
     docker port "$NAME" 22 >/dev/null 2>&1 || {
         echo "Container laeuft ohne SSH - erst 'devenv down', dann 'devenv test'" >&2
         exit 1
     }
-    rm -f "$key" "${key}.pub"
+    key=$(mktemp "${TMPDIR:-/tmp}/cockpit-docker-devenv-key.XXXXXX")
+    rm -f "$key"                       # mktemp creates it; ssh-keygen wants to create it itself
+    trap 'rm -f "$key" "$key.pub"' EXIT INT TERM
     ssh-keygen -q -t ed25519 -N '' -f "$key"
     docker exec -i "$NAME" sh -c \
         'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \

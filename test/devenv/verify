@@ -250,6 +250,7 @@ verify_testmode() {
     FAILED=0
     DEVENV="$REPO_ROOT/test/devenv/devenv"
     key=${TMPDIR:-/tmp}/devenv-verify-key-$$
+    trap 'rm -f "$key" "$key.pub"' EXIT INT TERM
 
     "$DEVENV" down >/dev/null 2>&1 || true
     "$DEVENV" up --ssh >/dev/null
@@ -274,6 +275,7 @@ verify_testmode() {
     fi
 
     rm -f "$key" "${key}.pub"
+    trap - EXIT INT TERM
     [ "$FAILED" -eq 0 ] || return 1
 }
 

@@ -21,9 +21,10 @@ RUN apt-get update -qq \
         cockpit-ws cockpit-bridge cockpit-system \
         sudo iproute2 ca-certificates curl gnupg \
     && if [ "$DOCKER_SOURCE" = "distro" ]; then \
-           apt-get install -y -qq --no-install-recommends docker.io \
+           apt-get install -y -qq --no-install-recommends docker.io docker-cli \
            && (apt-get install -y -qq --no-install-recommends docker-compose-v2 \
-               || apt-get install -y -qq --no-install-recommends docker-compose-plugin); \
+               || apt-get install -y -qq --no-install-recommends docker-compose-plugin \
+               || apt-get install -y -qq --no-install-recommends docker-compose); \
        else \
            . /etc/os-release \
            && install -m 0755 -d /etc/apt/keyrings \

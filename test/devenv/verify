@@ -192,12 +192,66 @@ verify_mount() {
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+verify_distros() {
+    echo "== Distributionen =="
+    FAILED=0
+    c=devenv-distro-$$
+    img=cockpit-docker-devenv-debian
+
+    docker build -q --build-arg BASE=debian:13 -t "$img" \
+        -f "$REPO_ROOT/test/devenv/Containerfile" "$REPO_ROOT/test/devenv" >/dev/null
+    pass "Image baut auf debian:13"
+
+    docker run -d --name "$c" --privileged \
+        -v "${c}-docker:/var/lib/docker" \
+        -v "${c}-containerd:/var/lib/containerd" \
+        "$img" >/dev/null
+    trap 'docker rm -f "$c" >/dev/null 2>&1 || true; docker volume rm "${c}-docker" "${c}-containerd" >/dev/null 2>&1 || true' EXIT
+
+    i=0
+    while [ "$i" -lt 40 ]; do
+        docker exec "$c" systemctl is-active docker.service 2>/dev/null | grep -q '^active$' && break
+        sleep 2
+        i=$((i + 1))
+    done
+
+    check "cockpit.socket aktiv (debian)" \
+        sh -c "docker exec $c systemctl is-active cockpit.socket | grep -q '^active$'"
+    check "docker.service aktiv (debian)" \
+        sh -c "docker exec $c systemctl is-active docker.service | grep -q '^active$'"
+    check "compose v2 vorhanden (debian)" \
+        sh -c "docker exec $c docker compose version >/dev/null"
+
+    # Versionen protokollieren: sie beantworten offene Punkte der Client-Spec.
+    echo "  Debian 13: $(docker exec "$c" docker --version 2>/dev/null || echo '?')"
+    echo "             $(docker exec "$c" docker compose version 2>/dev/null || echo '?')"
+
+    # Ausgabeformate auf dieser Version festhalten -- der tolerante Parser der
+    # Client-Schicht muss beide Varianten vertragen.
+    echo "  compose ls  beginnt mit: $(docker exec "$c" docker compose ls --format json 2>/dev/null | cut -c1-1)  ([ = Array)"
+
+    # Zweite Quelle: nur bauen, nicht starten -- belegt, dass das Repo greift.
+    if docker build -q --build-arg BASE=debian:13 --build-arg DOCKER_SOURCE=docker.com \
+        -t "${img}-dockercom" -f "$REPO_ROOT/test/devenv/Containerfile" \
+        "$REPO_ROOT/test/devenv" >/dev/null 2>&1; then
+        pass "Image baut mit DOCKER_SOURCE=docker.com"
+    else
+        fail "Image baut nicht mit DOCKER_SOURCE=docker.com (Repo fuer diesen Codename vorhanden?)"
+    fi
+
+    docker rm -f "$c" >/dev/null 2>&1 || true
+    docker volume rm "${c}-docker" "${c}-containerd" >/dev/null 2>&1 || true
+    trap - EXIT
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
 case "${1:-all}" in
     image)     verify_image ;;
     lifecycle) verify_lifecycle ;;
     fixtures)  verify_fixtures ;;
     mount)     verify_mount ;;
-    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount ;;
+    distros)   verify_distros ;;
+    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount && verify_distros ;;
     *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
 echo "alle Pruefungen bestanden"

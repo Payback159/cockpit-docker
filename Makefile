@@ -95,7 +95,7 @@ watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 # noch einen Browser.
 test: $(NODE_MODULES_TEST)
 	./build-tests.js
-	node --test "dist-test/**/*.test.js"
+	cd dist-test && node --test
 
 # Containerisierte Entwicklungsumgebung. Startet Cockpit mit einem EIGENEN
 # Docker-Daemon; dist/ wird eingehaengt, daher genuegt neben `make devenv`

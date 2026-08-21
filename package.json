@@ -16,7 +16,7 @@
     "eslint:fix": "eslint --fix src/",
     "stylelint": "stylelint src/*{.css,scss}",
     "stylelint:fix": "stylelint --fix src/*{.css,scss}",
-    "test": "./build-tests.js && node --test \"dist-test/**/*.test.js\""
+    "test": "./build-tests.js && cd dist-test && node --test"
   },
   "devDependencies": {
     "@patternfly/react-table": "^6.3.1",

@@ -38,6 +38,12 @@ test('parseJsonList erkennt das Array auch mit fuehrendem Leerraum', () => {
     assert.deepEqual(out, [{ x: 1 }]);
 });
 
+// `docker volume inspect` gibt ein mehrzeilig formatiertes Array aus.
+test('parseJsonList nimmt ein mehrzeilig formatiertes Array', () => {
+    const out = parseJsonList<{ Name: string }>('[\n  {\n    "Name": "v1"\n  },\n  {\n    "Name": "v2"\n  }\n]');
+    assert.deepEqual(out.map(o => o.Name), ['v1', 'v2']);
+});
+
 test('parseJsonList wirft bei kaputtem JSON', () => {
     assert.throws(() => parseJsonList('{nicht json}'));
 });

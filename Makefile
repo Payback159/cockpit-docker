@@ -90,6 +90,15 @@ $(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type
 watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 	NODE_ENV=$(NODE_ENV) ./build.js --watch
 
+# Containerisierte Entwicklungsumgebung. Startet Cockpit mit einem EIGENEN
+# Docker-Daemon; dist/ wird eingehaengt, daher genuegt neben `make devenv`
+# ein laufendes `make watch` plus Browser-Reload.
+devenv: $(DIST_TEST)
+	test/devenv/devenv up
+
+devenv-stop:
+	test/devenv/devenv down
+
 clean:
 	rm -rf dist/
 	rm -f $(SPEC) packaging/arch/PKGBUILD
@@ -198,4 +207,4 @@ $(NODE_MODULES_TEST): package.json
 	env -u NODE_ENV npm install --ignore-scripts
 	env -u NODE_ENV npm prune
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm devenv devenv-stop

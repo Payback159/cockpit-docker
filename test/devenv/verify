@@ -160,11 +160,44 @@ verify_fixtures() {
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+verify_mount() {
+    echo "== Mount und Make-Targets =="
+    FAILED=0
+    DEVENV="$REPO_ROOT/test/devenv/devenv"
+
+    running=$(docker ps --filter "name=^cockpit-docker-devenv$" --format '{{.Names}}' || true)
+    [ -n "$running" ] || "$DEVENV" up >/dev/null
+
+    check "Cockpit erkennt das Modul" \
+        sh -c "docker exec -u devel cockpit-docker-devenv cockpit-bridge --packages | grep -q cockpit-docker"
+
+    # Watch-Ablauf: eine Aenderung an dist/ muss im Container sofort sichtbar
+    # sein, ohne Neustart.
+    marker="devenv-mount-probe-$$"
+    echo "$marker" > "$REPO_ROOT/dist/.devenv-probe"
+    if docker exec cockpit-docker-devenv \
+        grep -qx "$marker" /usr/local/share/cockpit/cockpit-docker/.devenv-probe 2>/dev/null; then
+        pass "dist/ wirkt ohne Containerneustart"
+    else
+        fail "dist/ wirkt nicht ohne Containerneustart"
+    fi
+    rm -f "$REPO_ROOT/dist/.devenv-probe"
+
+    check "Mount ist read-only" \
+        sh -c "! docker exec cockpit-docker-devenv touch /usr/local/share/cockpit/cockpit-docker/.rw-probe 2>/dev/null"
+
+    check "Make-Target devenv existiert"      sh -c "make -n devenv >/dev/null 2>&1"
+    check "Make-Target devenv-stop existiert" sh -c "make -n devenv-stop >/dev/null 2>&1"
+
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
 case "${1:-all}" in
     image)     verify_image ;;
     lifecycle) verify_lifecycle ;;
     fixtures)  verify_fixtures ;;
-    all)       verify_image && verify_lifecycle && verify_fixtures ;;
+    mount)     verify_mount ;;
+    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount ;;
     *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
 echo "alle Pruefungen bestanden"

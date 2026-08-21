@@ -108,6 +108,42 @@ Violations of some rules can be fixed automatically by:
 
 Rules configuration can be found in the `.stylelintrc.json` file.
 
+# Local development environment
+
+Instead of deploying to a server on every change, you can run Cockpit and
+Docker in a container:
+
+    make devenv
+
+This starts Cockpit on <http://127.0.0.1:19090>. Log in as `devel` / `devel`
+(a member of the `docker` group, so the module works without administrative
+access) or as `admin` / `admin` (an administrator who is *not* in the `docker`
+group, so the module has to escalate). Sample Compose projects are loaded
+automatically.
+
+The build output in `dist/` is mounted into the container, so running
+
+    make watch
+
+in a second terminal is enough — reload the browser to see your changes. No
+rebuild of the container, no redeploy.
+
+To stop it and remove the storage volumes:
+
+    make devenv-stop
+
+Further commands:
+
+    test/devenv/devenv shell              # a shell inside the container
+    test/devenv/devenv reset              # reload the sample projects
+    test/devenv/devenv up --base debian:13  # run against a different distribution
+    test/devenv/verify                    # check that the environment works
+
+The container runs with `--privileged`. This is required because it runs its
+**own** Docker daemon rather than mounting the host's socket — otherwise
+actions such as "Prune unused" or "Down" would operate on your real containers
+and volumes. The port is bound to `127.0.0.1` only.
+
 # Running tests locally
 
 Run `make check` to build an RPM, install it into a standard Cockpit test VM

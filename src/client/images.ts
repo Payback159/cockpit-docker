@@ -35,6 +35,17 @@ interface RawContainer {
     Labels?: string;
 }
 
+/* `docker ps` meldet das Image so, wie es referenziert wurde: `busybox` oder
+ * `busybox:latest`. `docker images` liefert Repository und Tag getrennt, also
+ * immer mit Tag. Ohne Normalisierung findet die Zuordnung das Image nicht. */
+function normalizeRef(ref: string): string {
+    if (ref.includes('@'))
+        return ref;                       // Digest-Referenz, siehe unten
+    const lastSlash = ref.lastIndexOf('/');
+    const colon = ref.indexOf(':', lastSlash + 1);
+    return colon === -1 ? `${ref}:latest` : ref;
+}
+
 export async function listImages(): Promise<DockerImage[]> {
     const [imagesOut, containersOut] = await Promise.all([
         run(['docker', 'images', '--format', 'json']),
@@ -43,20 +54,30 @@ export async function listImages(): Promise<DockerImage[]> {
     ]);
 
     // Welches Image gehoert zu welchen Compose-Projekten?
+    //
+    // Bekannte Grenze: referenziert ein Container sein Image ueber einen
+    // Digest (`repo@sha256:...`), wird es hier nicht zugeordnet. Das
+    // aufzuloesen braeuchte einen zweiten Aufruf (`docker images
+    // --digests`), und Compose-Dateien referenzieren Images in der Praxis
+    // ueber Tags, nicht ueber Digests -- der Fall bleibt daher bewusst
+    // unbehandelt.
     const projectsByImage = new Map<string, Set<string>>();
     for (const c of parseJsonList<RawContainer>(containersOut)) {
         const project = parseLabels(c.Labels)['com.docker.compose.project'];
         if (!project)
             continue;
-        const key = c.Image;
+        const key = normalizeRef(c.Image);
         if (!projectsByImage.has(key))
             projectsByImage.set(key, new Set());
         projectsByImage.get(key)!.add(project);
     }
 
     return parseJsonList<RawImage>(imagesOut).map(img => {
-        const ref = `${img.Repository}:${img.Tag}`;
-        const projects = projectsByImage.get(ref);
+        // Ein Image ohne Tag (`<none>`) kann ueber seine Referenz nie
+        // getroffen werden -- keinen Schluessel dafuer bilden.
+        const projects = img.Tag === '<none>'
+            ? undefined
+            : projectsByImage.get(`${img.Repository}:${img.Tag}`);
         return {
             ID: img.ID,
             Repository: img.Repository,

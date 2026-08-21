@@ -129,3 +129,62 @@ test('listImages markiert von Compose genutzte Images', async () => {
     assert.equal(out[0].UsedByCompose, true);
     assert.deepEqual(out[0].ComposeProjects, ['simple']);
 });
+
+test('listImages ordnet ein Image ohne expliziten Tag zu', async () => {
+    await primeAccess();
+    // Compose-Datei sagt `image: busybox`, docker images meldet Tag latest.
+    setSpawnHandler(call => {
+        if (call.args[1] === 'images')
+            return JSON.stringify({
+                ID: 'i1', Repository: 'busybox', Tag: 'latest',
+                Size: '4MB', CreatedAt: 'x',
+            });
+        return JSON.stringify({
+            ID: 'c1', Names: 'simple-web-1', Image: 'busybox',
+            State: 'running', Status: 'Up', Ports: '',
+            Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
+        });
+    });
+    const out = await listImages();
+    assert.equal(out[0].UsedByCompose, true);
+    assert.deepEqual(out[0].ComposeProjects, ['simple']);
+});
+
+test('listImages laesst ein Image mit Tag <none> unzugeordnet', async () => {
+    await primeAccess();
+    setSpawnHandler(call => {
+        if (call.args[1] === 'images')
+            return JSON.stringify({
+                ID: 'i1', Repository: 'busybox', Tag: '<none>',
+                Size: '4MB', CreatedAt: 'x',
+            });
+        return JSON.stringify({
+            ID: 'c1', Names: 'simple-web-1', Image: 'busybox:<none>',
+            State: 'running', Status: 'Up', Ports: '',
+            Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
+        });
+    });
+    const out = await listImages();
+    assert.equal(out[0].UsedByCompose, false);
+    assert.deepEqual(out[0].ComposeProjects, []);
+});
+
+test('listImages ordnet eine Digest-Referenz bewusst NICHT zu (bekannte Grenze)', async () => {
+    await primeAccess();
+    setSpawnHandler(call => {
+        if (call.args[1] === 'images')
+            return JSON.stringify({
+                ID: 'i1', Repository: 'busybox', Tag: 'latest',
+                Size: '4MB', CreatedAt: 'x',
+            });
+        return JSON.stringify({
+            ID: 'c1', Names: 'simple-web-1',
+            Image: 'busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd',
+            State: 'running', Status: 'Up', Ports: '',
+            Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
+        });
+    });
+    const out = await listImages();
+    assert.equal(out[0].UsedByCompose, false);
+    assert.deepEqual(out[0].ComposeProjects, []);
+});

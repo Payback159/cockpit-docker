@@ -70,6 +70,7 @@ verify_lifecycle() {
     echo "== Lebenszyklus =="
     FAILED=0
     DEVENV="$REPO_ROOT/test/devenv/devenv"
+    PORT=${DEVENV_PORT:-19090}
 
     "$DEVENV" down >/dev/null 2>&1 || true
 
@@ -79,7 +80,7 @@ verify_lifecycle() {
     check "Container laeuft" \
         sh -c "docker ps --filter name=cockpit-docker-devenv --format '{{.Names}}' | grep -qx cockpit-docker-devenv"
     check "Cockpit antwortet mit HTTP 200" \
-        sh -c "curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:19090/ | grep -qx 200"
+        sh -c "curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/ | grep -qx 200"
     check "Port nur auf 127.0.0.1 gebunden" \
         sh -c "docker port cockpit-docker-devenv 9090 | grep -q '^127.0.0.1:'"
     check "Volume /var/lib/docker vorhanden" \
@@ -87,13 +88,15 @@ verify_lifecycle() {
     check "Volume /var/lib/containerd vorhanden" \
         sh -c "docker volume ls -q | grep -qx cockpit-docker-devenv-containerd"
 
-    # Isolation: der Container darf die Volumes des Hosts nicht sehen.
-    host_vols=$(docker volume ls -q | wc -l)
-    cont_vols=$(docker exec cockpit-docker-devenv docker volume ls -q 2>/dev/null | wc -l)
-    if [ "$cont_vols" -lt "$host_vols" ]; then
-        pass "Isolation: Container sieht $cont_vols statt $host_vols Volumes"
+    # Inhaltliche Pruefung statt Zaehlung: nach `up` existiert auf dem Host
+    # garantiert das Volume cockpit-docker-devenv-docker. Sieht der Container
+    # es ebenfalls, teilt er den Daemon des Hosts -- dann ist die Isolation
+    # verletzt. Diese Pruefung ist unabhaengig davon, wie viele Volumes es gibt.
+    if docker exec cockpit-docker-devenv docker volume ls -q 2>/dev/null \
+        | grep -qx cockpit-docker-devenv-docker; then
+        fail "Isolation: Container sieht das Host-Volume cockpit-docker-devenv-docker"
     else
-        fail "Isolation: Container sieht $cont_vols Volumes, Host hat $host_vols"
+        pass "Isolation: Host-Volume im Container nicht sichtbar"
     fi
 
     check "up ist idempotent" "$DEVENV" up

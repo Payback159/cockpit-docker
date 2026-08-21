@@ -90,6 +90,13 @@ $(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type
 watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 	NODE_ENV=$(NODE_ENV) ./build.js --watch
 
+# Unit-Tests der cockpit-freien Client-Module. Baut die *.test.ts mit esbuild
+# nach dist-test/ und laesst sie von node --test laufen; braucht weder Docker
+# noch einen Browser.
+test: $(NODE_MODULES_TEST)
+	./build-tests.js
+	node --test "dist-test/**/*.test.js"
+
 # Containerisierte Entwicklungsumgebung. Startet Cockpit mit einem EIGENEN
 # Docker-Daemon; dist/ wird eingehaengt, daher genuegt neben `make devenv`
 # ein laufendes `make watch` plus Browser-Reload.
@@ -207,4 +214,4 @@ $(NODE_MODULES_TEST): package.json
 	env -u NODE_ENV npm install --ignore-scripts
 	env -u NODE_ENV npm prune
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm devenv devenv-stop
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm devenv devenv-stop test

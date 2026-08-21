@@ -7,7 +7,7 @@
   "author": "",
   "license": "LGPL-2.1",
   "engines": {
-    "node": ">= 16"
+    "node": ">=20"
   },
   "scripts": {
     "watch": "ESBUILD_WATCH='true' ./build.js",
@@ -15,7 +15,8 @@
     "eslint": "eslint src/",
     "eslint:fix": "eslint --fix src/",
     "stylelint": "stylelint src/*{.css,scss}",
-    "stylelint:fix": "stylelint --fix src/*{.css,scss}"
+    "stylelint:fix": "stylelint --fix src/*{.css,scss}",
+    "test": "./build-tests.js && node --test \"dist-test/**/*.test.js\""
   },
   "devDependencies": {
     "@patternfly/react-table": "^6.3.1",
@@ -38,7 +39,6 @@
     "gettext-parser": "8.0.0",
     "glob": "11.0.3",
     "jed": "1.1.1",
-    "qunit": "2.24.2",
     "stylelint": "16.25.0",
     "stylelint-config-recommended-scss": "16.0.2",
     "stylelint-config-standard": "39.0.1",

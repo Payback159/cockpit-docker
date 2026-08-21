@@ -1,0 +1,74 @@
+#!/bin/sh
+# Ausführbare Prüfungen der Erfolgskriterien aus
+# docs/superpowers/specs/2026-08-21-test-environment-design.md
+set -eu
+
+IMAGE=cockpit-docker-devenv
+REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+
+pass() { printf '  ok    %s\n' "$1"; }
+fail() { printf '  FAIL  %s\n' "$1"; FAILED=$((FAILED + 1)); }
+check() {
+    # check <Beschreibung> <Kommando...>
+    desc=$1; shift
+    if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi
+}
+
+verify_image() {
+    echo "== Image =="
+    FAILED=0
+    c=devenv-verify-$$
+
+    docker build -q -t "$IMAGE" -f "$REPO_ROOT/test/devenv/Containerfile" \
+        "$REPO_ROOT/test/devenv" >/dev/null
+    pass "Image baut"
+
+    # Global Constraint: keine tmpfs-/cgroup-Handmounts, nur --privileged
+    docker run -d --name "$c" --privileged "$IMAGE" >/dev/null
+    trap 'docker rm -f "$c" >/dev/null 2>&1 || true' EXIT
+
+    i=0
+    while [ "$i" -lt 30 ]; do
+        if docker exec "$c" systemctl is-active docker.service 2>/dev/null | grep -q '^active$'; then
+            break
+        fi
+        sleep 2
+        i=$((i + 1))
+    done
+
+    check "systemd laeuft"        docker exec "$c" systemctl is-system-running --wait
+    check "cockpit.socket aktiv"  sh -c "docker exec $c systemctl is-active cockpit.socket | grep -q '^active$'"
+    check "docker.service aktiv"  sh -c "docker exec $c systemctl is-active docker.service | grep -q '^active$'"
+    check "eigener Daemon"        docker exec "$c" docker info
+    check "compose v2 vorhanden"  sh -c "docker exec $c docker compose version | grep -qi 'v\\?2\\.\\|v\\?[3-9]\\.'"
+    check "devel in Gruppe docker"     sh -c "docker exec $c id -nG devel | tr ' ' '\\n' | grep -qx docker"
+    check "admin NICHT in docker"      sh -c "! docker exec $c id -nG admin | tr ' ' '\\n' | grep -qx docker"
+    check "admin in Gruppe sudo"       sh -c "docker exec $c id -nG admin | tr ' ' '\\n' | grep -qx sudo"
+    # Erfolgskriterium 3 der Spec: nicht nur Gruppenzugehoerigkeit, sondern
+    # tatsaechliches Verhalten der beiden Zugriffslagen.
+    check "devel erreicht Docker ohne Rechteerhoehung" \
+        sh -c "docker exec -u devel $c docker ps -q"
+    if docker exec -u admin "$c" docker ps -q >/dev/null 2>&1; then
+        fail "admin erreicht Docker ohne sudo (muss scheitern)"
+    else
+        pass "admin scheitert ohne sudo (wie erwartet)"
+        # Fehlertext protokollieren: beantwortet den offenen Punkt
+        # "permission-denied-Muster" aus der Client-Spec.
+        echo "  Muster: $(docker exec -u admin "$c" docker ps 2>&1 | head -1 | cut -c1-110)"
+    fi
+    check "admin erreicht Docker mit sudo" \
+        sh -c "docker exec -u admin $c sh -c 'echo admin | sudo -S docker ps -q' 2>/dev/null"
+
+    check "getty maskiert (kein degraded)" sh -c "docker exec $c systemctl is-enabled getty@tty1 2>&1 | grep -q masked"
+
+    docker rm -f "$c" >/dev/null 2>&1 || true
+    trap - EXIT
+    [ "$FAILED" -eq 0 ] || return 1
+}
+
+case "${1:-all}" in
+    image) verify_image ;;
+    all)   verify_image ;;
+    *)     echo "Unbekannt: $1" >&2; exit 2 ;;
+esac
+echo "alle Pruefungen bestanden"

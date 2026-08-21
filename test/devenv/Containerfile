@@ -1,0 +1,63 @@
+# Test- und Entwicklungsumgebung fuer cockpit-docker.
+#
+# systemd laeuft als PID 1, damit cockpit.socket und docker.service so starten
+# wie auf einem echten Server. Der Container braucht --privileged, weil er
+# einen EIGENEN Docker-Daemon betreibt (Docker-in-Docker) statt den Socket des
+# Hosts einzuhaengen -- sonst wuerden Aktionen wie "Prune" oder "Down" echte
+# Daten des Hosts loeschen.
+ARG BASE=ubuntu:26.04
+FROM ${BASE}
+
+# distro     = docker.io + docker-compose-v2 aus der Distribution
+# docker.com = docker-ce + docker-compose-plugin aus dem offiziellen Repo
+ARG DOCKER_SOURCE=distro
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV container=docker
+
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        systemd systemd-sysv dbus \
+        cockpit-ws cockpit-bridge cockpit-system \
+        sudo iproute2 ca-certificates curl gnupg \
+    && if [ "$DOCKER_SOURCE" = "distro" ]; then \
+           apt-get install -y -qq --no-install-recommends docker.io \
+           && (apt-get install -y -qq --no-install-recommends docker-compose-v2 \
+               || apt-get install -y -qq --no-install-recommends docker-compose-plugin); \
+       else \
+           . /etc/os-release \
+           && install -m 0755 -d /etc/apt/keyrings \
+           && curl -fsSL "https://download.docker.com/linux/$ID/gpg" \
+                -o /etc/apt/keyrings/docker.asc \
+           && chmod a+r /etc/apt/keyrings/docker.asc \
+           && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$ID $VERSION_CODENAME stable" \
+                > /etc/apt/sources.list.d/docker.list \
+           && apt-get update -qq \
+           && apt-get install -y -qq --no-install-recommends \
+                docker-ce docker-ce-cli containerd.io docker-compose-plugin; \
+       fi \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Zwei Nutzer fuer die zwei Zugriffslagen der Client-Schicht:
+#   devel: in Gruppe docker  -> erreicht Docker OHNE Rechteerhoehung
+#   admin: nur in sudo       -> braucht superuser, loest "permission denied" aus
+RUN useradd -m -s /bin/bash -G sudo,docker devel \
+    && echo 'devel:devel' | chpasswd \
+    && useradd -m -s /bin/bash -G sudo admin \
+    && echo 'admin:admin' | chpasswd
+
+# Kein TLS: der Zugriff erfolgt ausschliesslich ueber 127.0.0.1.
+RUN mkdir -p /etc/cockpit \
+    && printf '[WebService]\nAllowUnencrypted=true\n' > /etc/cockpit/cockpit.conf
+
+# Dienste, die im Container nicht laufen koennen und sonst "degraded" erzeugen.
+RUN systemctl mask systemd-udevd systemd-udev-trigger systemd-modules-load \
+        systemd-networkd-wait-online e2scrub_reap getty@tty1 \
+        getty.target console-getty 2>/dev/null || true
+
+RUN systemctl enable cockpit.socket docker.service
+
+STOPSIGNAL SIGRTMIN+3
+EXPOSE 9090
+CMD ["/sbin/init"]

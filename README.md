@@ -134,10 +134,56 @@ To stop it and remove the storage volumes:
 
 Further commands:
 
-    test/devenv/devenv shell              # a shell inside the container
-    test/devenv/devenv reset              # reload the sample projects
-    test/devenv/devenv up --base debian:13  # run against a different distribution
-    test/devenv/verify                    # check that the environment works
+    test/devenv/devenv shell                     # a shell inside the container
+    test/devenv/devenv reset                     # reload the sample projects
+    test/devenv/devenv up --base debian:13       # run against a different distribution
+    test/devenv/devenv up --source docker.com    # Docker from the official repo instead of the distribution
+    test/devenv/devenv up --ssh                  # additionally publish sshd (see "Running the test suite" below)
+
+`--base` and `--source` only take effect when the container is created. If one
+is already running with different settings, `up` refuses and asks you to run
+`down` first, rather than silently measuring the wrong distribution.
+
+Two environment variables move the published ports if 19090 or 12222 are taken:
+
+    DEVENV_PORT=29090 make devenv              # Cockpit
+    DEVENV_SSH_PORT=12345 test/devenv/devenv up --ssh   # sshd
+
+## Running the test suite against the container
+
+    test/devenv/devenv test [run-tests options...]
+
+This starts the container with `sshd`, installs `bots/machine/identity.pub`
+into root's `authorized_keys` — that is the key Cockpit's test machinery uses
+by default — and runs
+
+    test/common/run-tests --machine 127.0.0.1:<ssh port> --browser 127.0.0.1:19090
+
+The runner and the browser stay outside the container. Both `bots/` and
+`test/common/` are checked out on demand, so run `make bots` and
+`make test/common` first; `devenv test` says so if they are missing.
+
+Two things to expect, so they don't come as a surprise:
+
+* **The suite is currently red.** `test/check-application` still tests the
+  starter-kit page this project was forked from, not the Docker module.
+  Rewriting it is separate work.
+* **The runner needs the Python module `aiohttp`** (used by
+  `test/common/webdriver_bidi.py`). Without it `run-tests` aborts on import
+  before it ever connects. Install it (for example `sudo apt install
+  python3-aiohttp`) if you want to run the suite locally.
+
+## Checking the environment itself
+
+    test/devenv/verify            # all checks
+    test/devenv/verify lifecycle  # a single group
+
+`verify` checks the environment against the design's success criteria. **It is
+destructive:** it runs `devenv down`, which removes the container *and* both
+storage volumes (so the next start re-pulls the images), and it deliberately
+leaves nothing running or built behind — including the Debian images it makes
+for the cross-distribution checks. Do not run it while you are working in the
+environment. It exits non-zero if any check fails.
 
 The container runs with `--privileged`. This is required because it runs its
 **own** Docker daemon rather than mounting the host's socket — otherwise

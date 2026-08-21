@@ -65,6 +65,17 @@ wait_ready() {
 case $cmd in
 up)
     if running; then
+        # --base/--source duerfen nicht stillschweigend ignoriert werden: sonst
+        # misst man Ubuntu, waehrend man Debian angefordert hat.
+        cur_base=$(docker inspect -f '{{index .Config.Labels "devenv.base"}}' "$NAME" 2>/dev/null || true)
+        cur_source=$(docker inspect -f '{{index .Config.Labels "devenv.source"}}' "$NAME" 2>/dev/null || true)
+        if [ -n "$cur_base" ] && \
+           { [ "$cur_base" != "$BASE" ] || [ "$cur_source" != "$DOCKER_SOURCE" ]; }; then
+            echo "Laeuft bereits mit --base $cur_base --source $cur_source," >&2
+            echo "angefordert wurde --base $BASE --source $DOCKER_SOURCE." >&2
+            echo "Erst 'devenv down', dann erneut starten." >&2
+            exit 1
+        fi
         echo "Laeuft bereits: http://127.0.0.1:$PORT"
         exit 0
     fi
@@ -76,6 +87,7 @@ up)
     [ "$WITH_SSH" -eq 1 ] && ssh_opt="-p 127.0.0.1:$SSH_PORT:22"
     # shellcheck disable=SC2086
     docker run -d --name "$NAME" --privileged \
+        --label "devenv.base=$BASE" --label "devenv.source=$DOCKER_SOURCE" \
         -p "127.0.0.1:$PORT:9090" $ssh_opt \
         -v "$VOL_DOCKER:/var/lib/docker" \
         -v "$VOL_CONTAINERD:/var/lib/containerd" \
@@ -108,26 +120,41 @@ reset)
     echo "Fixtures zurueckgesetzt"
     ;;
 test)
-    running || "$0" up --ssh
+    # Cockpits run-tests baut die Maschine ohne identity_file, also greift
+    # machine.py auf DEFAULT_IDENTITY_FILE = bots/machine/identity zurueck und
+    # meldet sich als root an. Genau dieser oeffentliche Schluessel muss also in
+    # authorized_keys liegen -- ein selbst erzeugter Schluessel erreicht den
+    # Runner nicht und endet in "Permission denied (publickey)".
+    ID_PUB=$REPO_ROOT/bots/machine/identity.pub
+    RUN_TESTS=$REPO_ROOT/test/common/run-tests
+    # bots/ und test/common/ sind gitignored und werden nachgeladen.
+    [ -f "$ID_PUB" ] || {
+        echo "Fehlt: $ID_PUB" >&2
+        echo "Cockpits bots sind nicht ausgecheckt - erst 'make bots' ausfuehren." >&2
+        exit 1
+    }
+    [ -x "$RUN_TESTS" ] || {
+        echo "Fehlt: $RUN_TESTS" >&2
+        echo "Cockpits test/common ist nicht ausgecheckt - erst 'make test/common' ausfuehren." >&2
+        exit 1
+    }
+    "$0" up --ssh --base "$BASE" --source "$DOCKER_SOURCE"
     docker port "$NAME" 22 >/dev/null 2>&1 || {
         echo "Container laeuft ohne SSH - erst 'devenv down', dann 'devenv test'" >&2
         exit 1
     }
-    key=$(mktemp "${TMPDIR:-/tmp}/cockpit-docker-devenv-key.XXXXXX")
-    rm -f "$key"                       # mktemp creates it; ssh-keygen wants to create it itself
-    trap 'rm -f "$key" "$key.pub"' EXIT INT TERM
-    ssh-keygen -q -t ed25519 -N '' -f "$key"
+    # Ueberschreiben statt anhaengen: mehrfache Laeufe sollen die Datei nicht
+    # aufblaehen.
     docker exec -i "$NAME" sh -c \
-        'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
-        < "${key}.pub"
-    sshp=$(docker port "$NAME" 22 | cut -d: -f2)
-    echo "run-tests gegen 127.0.0.1:$sshp (ssh) und 127.0.0.1:$PORT (web)"
-    GIT_SSH_COMMAND="ssh -i $key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-    TEST_SSH_KEY="$key" \
-        "$REPO_ROOT/test/common/run-tests" \
-            --machine "127.0.0.1:$sshp" \
-            --browser "127.0.0.1:$PORT" \
-            "$@"
+        'mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys' \
+        < "$ID_PUB"
+    sshp=$(docker port "$NAME" 22 | head -1 | cut -d: -f2)
+    echo "run-tests gegen 127.0.0.1:$sshp (ssh, Schluessel bots/machine/identity)"
+    echo "und 127.0.0.1:$PORT (web)"
+    "$RUN_TESTS" \
+        --machine "127.0.0.1:$sshp" \
+        --browser "127.0.0.1:$PORT" \
+        "$@"
     ;;
 *)
     usage

@@ -1,9 +1,13 @@
 #!/bin/sh
 # Ausführbare Prüfungen der Erfolgskriterien aus
 # docs/superpowers/specs/2026-08-21-test-environment-design.md
+#
+# ACHTUNG: destruktiv. Das Skript ruft `devenv down`, entfernt also Container
+# UND beide Storage-Volumes, und hinterlaesst am Ende nichts Laufendes.
 set -eu
 
 IMAGE=cockpit-docker-devenv
+DEBIAN_IMAGE=cockpit-docker-devenv-debian
 REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 
 pass() { printf '  ok    %s\n' "$1"; }
@@ -13,19 +17,35 @@ check() {
     desc=$1; shift
     if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi
 }
+try() {
+    # try <Beschreibung> <Kommando...>  -- wie check, aber fuer Kommandos,
+    # auf denen die folgenden Pruefungen aufbauen: bei Fehlschlag wird der
+    # Fehlertext gezeigt und ein Rueckgabewert != 0 geliefert, damit der
+    # Aufrufer die Pruefgruppe abbrechen kann.
+    #
+    # Notwendig, weil `set -e` innerhalb von Funktionen, die in einer
+    # ||-Verkettung stehen, nicht greift: ein ungeprueftes Kommando mit
+    # anschliessendem `pass` waere eine Zusicherung, die nie fehlschlagen kann.
+    desc=$1; shift
+    if try_out=$("$@" 2>&1); then pass "$desc"; return 0; fi
+    fail "$desc"
+    printf '%s\n' "$try_out" | tail -10 | sed 's/^/        /'
+    return 1
+}
 
 verify_image() {
     echo "== Image =="
     FAILED=0
     c=devenv-verify-$$
 
-    docker build -q -t "$IMAGE" -f "$REPO_ROOT/test/devenv/Containerfile" \
-        "$REPO_ROOT/test/devenv" >/dev/null
-    pass "Image baut"
+    try "Image baut" \
+        docker build -q -t "$IMAGE" -f "$REPO_ROOT/test/devenv/Containerfile" \
+        "$REPO_ROOT/test/devenv" || return 1
 
     # Global Constraint: keine tmpfs-/cgroup-Handmounts, nur --privileged
-    docker run -d --name "$c" --privileged "$IMAGE" >/dev/null
     trap 'docker rm -f "$c" >/dev/null 2>&1 || true' EXIT
+    try "Container startet (--privileged, ohne Handmounts)" \
+        docker run -d --name "$c" --privileged "$IMAGE" || { trap - EXIT; return 1; }
 
     i=0
     while [ "$i" -lt 30 ]; do
@@ -74,8 +94,7 @@ verify_lifecycle() {
 
     "$DEVENV" down >/dev/null 2>&1 || true
 
-    "$DEVENV" up >/dev/null
-    pass "up laeuft durch"
+    try "up laeuft durch" "$DEVENV" up || return 1
 
     check "Container laeuft" \
         sh -c "docker ps --filter name=cockpit-docker-devenv --format '{{.Names}}' | grep -qx cockpit-docker-devenv"
@@ -92,8 +111,14 @@ verify_lifecycle() {
     # garantiert das Volume cockpit-docker-devenv-docker. Sieht der Container
     # es ebenfalls, teilt er den Daemon des Hosts -- dann ist die Isolation
     # verletzt. Diese Pruefung ist unabhaengig davon, wie viele Volumes es gibt.
-    if docker exec cockpit-docker-devenv docker volume ls -q 2>/dev/null \
-        | grep -qx cockpit-docker-devenv-docker; then
+    #
+    # Die Ausgabe wird festgehalten, statt direkt in `grep` zu laufen: scheitert
+    # `docker exec` selbst (Daemon noch nicht oben), ist stdout leer, `grep`
+    # scheitert -- und der else-Zweig meldete faelschlich Isolation in Ordnung.
+    if ! vols=$(docker exec cockpit-docker-devenv docker volume ls -q 2>&1); then
+        fail "Isolation: 'docker volume ls' im Container schlug fehl - nicht bewertbar"
+        printf '%s\n' "$vols" | tail -3 | sed 's/^/        /'
+    elif printf '%s\n' "$vols" | grep -qx cockpit-docker-devenv-docker; then
         fail "Isolation: Container sieht das Host-Volume cockpit-docker-devenv-docker"
     else
         pass "Isolation: Host-Volume im Container nicht sichtbar"
@@ -120,10 +145,9 @@ verify_fixtures() {
     dex() { docker exec cockpit-docker-devenv "$@"; }
 
     running=$(docker ps --filter "name=^cockpit-docker-devenv$" --format '{{.Names}}' || true)
-    [ -n "$running" ] || "$DEVENV" up >/dev/null
+    [ -n "$running" ] || try "up fuer Fixtures" "$DEVENV" up || return 1
 
-    dex /srv/fixtures/load.sh >/dev/null
-    pass "load.sh laeuft durch"
+    try "load.sh laeuft durch" dex /srv/fixtures/load.sh || return 1
 
     for p in simple multifile stopped manyservices; do
         check "Projekt $p existiert" \
@@ -166,7 +190,7 @@ verify_mount() {
     DEVENV="$REPO_ROOT/test/devenv/devenv"
 
     running=$(docker ps --filter "name=^cockpit-docker-devenv$" --format '{{.Names}}' || true)
-    [ -n "$running" ] || "$DEVENV" up >/dev/null
+    [ -n "$running" ] || try "up fuer Mount-Pruefung" "$DEVENV" up || return 1
 
     check "Cockpit erkennt das Modul" \
         sh -c "docker exec -u devel cockpit-docker-devenv cockpit-bridge --packages | grep -q cockpit-docker"
@@ -196,17 +220,28 @@ verify_distros() {
     echo "== Distributionen =="
     FAILED=0
     c=devenv-distro-$$
-    img=cockpit-docker-devenv-debian
+    img=$DEBIAN_IMAGE
 
-    docker build -q --build-arg BASE=debian:13 -t "$img" \
-        -f "$REPO_ROOT/test/devenv/Containerfile" "$REPO_ROOT/test/devenv" >/dev/null
-    pass "Image baut auf debian:13"
+    # Die beiden Debian-Images (~1,5 GB) werden am Ende wieder entfernt --
+    # verify soll nichts auf der Platte hinterlassen.
+    distro_cleanup() {
+        docker rm -f "$c" >/dev/null 2>&1 || true
+        docker volume rm "${c}-docker" "${c}-containerd" >/dev/null 2>&1 || true
+        docker image rm -f "$img" "${img}-dockercom" >/dev/null 2>&1 || true
+    }
 
-    docker run -d --name "$c" --privileged \
+    trap 'distro_cleanup' EXIT
+    try "Image baut auf debian:13" \
+        docker build -q --build-arg BASE=debian:13 -t "$img" \
+        -f "$REPO_ROOT/test/devenv/Containerfile" "$REPO_ROOT/test/devenv" \
+        || { distro_cleanup; trap - EXIT; return 1; }
+
+    try "Container startet auf debian:13" \
+        docker run -d --name "$c" --privileged \
         -v "${c}-docker:/var/lib/docker" \
         -v "${c}-containerd:/var/lib/containerd" \
-        "$img" >/dev/null
-    trap 'docker rm -f "$c" >/dev/null 2>&1 || true; docker volume rm "${c}-docker" "${c}-containerd" >/dev/null 2>&1 || true' EXIT
+        -v "$REPO_ROOT/test/fixtures:/srv/fixtures:ro" \
+        "$img" || { distro_cleanup; trap - EXIT; return 1; }
 
     i=0
     while [ "$i" -lt 40 ]; do
@@ -219,8 +254,10 @@ verify_distros() {
         sh -c "docker exec $c systemctl is-active cockpit.socket | grep -q '^active$'"
     check "docker.service aktiv (debian)" \
         sh -c "docker exec $c systemctl is-active docker.service | grep -q '^active$'"
+    # Gleicher Massstab wie auf Ubuntu: nicht nur "Kommando existiert", sondern
+    # tatsaechlich eine Version >= 2.
     check "compose v2 vorhanden (debian)" \
-        sh -c "docker exec $c docker compose version >/dev/null"
+        sh -c "docker exec $c docker compose version | grep -qi 'v\\?2\\.\\|v\\?[3-9]\\.'"
 
     # Versionen protokollieren: sie beantworten offene Punkte der Client-Spec.
     echo "  Debian 13: $(docker exec "$c" docker --version 2>/dev/null || echo '?')"
@@ -230,17 +267,28 @@ verify_distros() {
     # Client-Schicht muss beide Varianten vertragen.
     echo "  compose ls  beginnt mit: $(docker exec "$c" docker compose ls --format json 2>/dev/null | cut -c1-1)  ([ = Array)"
 
-    # Zweite Quelle: nur bauen, nicht starten -- belegt, dass das Repo greift.
-    if docker build -q --build-arg BASE=debian:13 --build-arg DOCKER_SOURCE=docker.com \
-        -t "${img}-dockercom" -f "$REPO_ROOT/test/devenv/Containerfile" \
-        "$REPO_ROOT/test/devenv" >/dev/null 2>&1; then
-        pass "Image baut mit DOCKER_SOURCE=docker.com"
+    # `compose ps` ist der versionsempfindliche Fall, fuer den die Fixtures da
+    # sind (NDJSON ab dem zweiten Service). Also auch auf Debian messen, nicht
+    # nur `compose ls`.
+    if docker exec "$c" sh -c \
+        'cd /srv/fixtures/04-many-services && docker compose -p manyservices up -d' \
+        >/dev/null 2>&1; then
+        ps_json=$(docker exec "$c" sh -c \
+            'cd /srv/fixtures/04-many-services && docker compose -p manyservices ps --format json' \
+            2>/dev/null || true)
+        echo "  compose ps  Zeilen: $(printf '%s\n' "$ps_json" | grep -c .), beginnt mit: $(printf '%s\n' "$ps_json" | head -1 | cut -c1-1)  ({ = NDJSON, [ = Array)"
     else
-        fail "Image baut nicht mit DOCKER_SOURCE=docker.com (Repo fuer diesen Codename vorhanden?)"
+        echo "  compose ps  nicht messbar (Fixture liess sich nicht starten)"
     fi
 
-    docker rm -f "$c" >/dev/null 2>&1 || true
-    docker volume rm "${c}-docker" "${c}-containerd" >/dev/null 2>&1 || true
+    # Zweite Quelle: nur bauen, nicht starten -- belegt, dass das Repo greift.
+    # Fehlertext sichtbar lassen: das ist der einzige sonst ungetestete Pfad.
+    try "Image baut mit DOCKER_SOURCE=docker.com" \
+        docker build -q --build-arg BASE=debian:13 --build-arg DOCKER_SOURCE=docker.com \
+        -t "${img}-dockercom" -f "$REPO_ROOT/test/devenv/Containerfile" \
+        "$REPO_ROOT/test/devenv" || true
+
+    distro_cleanup
     trap - EXIT
     [ "$FAILED" -eq 0 ] || return 1
 }
@@ -249,44 +297,101 @@ verify_testmode() {
     echo "== Betriebsart test =="
     FAILED=0
     DEVENV="$REPO_ROOT/test/devenv/devenv"
-    key=${TMPDIR:-/tmp}/devenv-verify-key-$$
-    trap 'rm -f "$key" "$key.pub"' EXIT INT TERM
+    ID="$REPO_ROOT/bots/machine/identity"
+
+    if [ ! -f "${ID}.pub" ] || [ ! -x "$REPO_ROOT/test/common/run-tests" ]; then
+        fail "bots/ oder test/common/ fehlt - erst 'make bots' und 'make test/common'"
+        return 1
+    fi
+
+    # Eigene Kopie des Runner-Schluessels: ssh besteht auf 0600, und
+    # bots/machine/identity soll dafuer nicht veraendert werden.
+    key=$(mktemp "${TMPDIR:-/tmp}/devenv-verify-key.XXXXXX")
+    trap 'rm -f "$key"' EXIT INT TERM
+    cat "$ID" > "$key"
+    chmod 600 "$key"
 
     "$DEVENV" down >/dev/null 2>&1 || true
-    "$DEVENV" up --ssh >/dev/null
 
+    # Nicht nachbauen, sondern die Unterkommando `test` selbst aufrufen: sonst
+    # bliebe diese Pruefung gruen, waehrend `devenv test` scheitert.
+    # `--list` ist der billigste Aufruf; run-tests selbst laeuft auf diesem
+    # Host nicht durch (Modul aiohttp fehlt) und die Suite ist ohnehin rot,
+    # weil test/check-application noch aufs starter-kit zielt. Geprueft wird
+    # daher der SSH-Handschlag, nicht ein gruener Lauf.
+    testout=$("$DEVENV" test --list 2>&1) || true
+    printf '%s\n' "$testout" | tail -4 | sed 's/^/        /'
+
+    check "devenv test startet die Umgebung" \
+        sh -c "docker ps --filter name=^cockpit-docker-devenv\$ --format '{{.Names}}' | grep -qx cockpit-docker-devenv"
     check "sshd laeuft im Container" \
         sh -c "docker exec cockpit-docker-devenv systemctl is-active ssh 2>/dev/null | grep -q '^active$' || docker exec cockpit-docker-devenv systemctl is-active sshd 2>/dev/null | grep -q '^active$'"
     check "SSH-Port gebunden" \
         sh -c "docker port cockpit-docker-devenv 22 | grep -q '^127.0.0.1:'"
 
-    ssh-keygen -q -t ed25519 -N '' -f "$key"
-    docker exec -i cockpit-docker-devenv sh -c \
-        'mkdir -p /root/.ssh && cat >> /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys' \
-        < "${key}.pub"
-
-    port=$(docker port cockpit-docker-devenv 22 | cut -d: -f2)
-    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-           -o ConnectTimeout=10 -i "$key" -p "$port" root@127.0.0.1 \
-           'echo verbunden' 2>/dev/null | grep -qx verbunden; then
-        pass "SSH-Verbindung von aussen moeglich"
+    # Der Runner baut die Maschine ohne identity_file, machine.py faellt auf
+    # bots/machine/identity zurueck und meldet sich als root an. Genau dieser
+    # Schluessel muss also von `devenv test` hinterlegt worden sein.
+    if ! authk=$(docker exec cockpit-docker-devenv cat /root/.ssh/authorized_keys 2>&1); then
+        fail "devenv test hat keine authorized_keys hinterlegt"
+        printf '%s\n' "$authk" | tail -3 | sed 's/^/        /'
+    elif printf '%s\n' "$authk" | grep -qF "$(cut -d' ' -f2 < "${ID}.pub")"; then
+        pass "devenv test hinterlegt bots/machine/identity.pub"
     else
-        fail "SSH-Verbindung von aussen nicht moeglich"
+        fail "authorized_keys enthaelt nicht bots/machine/identity.pub"
     fi
 
-    rm -f "$key" "${key}.pub"
+    port=$(docker port cockpit-docker-devenv 22 | head -1 | cut -d: -f2)
+    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+           -o ConnectTimeout=10 -o BatchMode=yes -i "$key" -p "$port" root@127.0.0.1 \
+           'echo verbunden' 2>/dev/null | grep -qx verbunden; then
+        pass "SSH-Handschlag mit dem Schluessel des Runners (root@, bots/machine/identity)"
+    else
+        fail "SSH-Handschlag mit dem Schluessel des Runners scheitert"
+    fi
+
+    if printf '%s\n' "$testout" | grep -qi 'permission denied'; then
+        fail "devenv test scheitert am SSH-Zugang (Permission denied)"
+    else
+        pass "devenv test scheitert nicht am SSH-Zugang"
+    fi
+
+    rm -f "$key"
     trap - EXIT INT TERM
     [ "$FAILED" -eq 0 ] || return 1
 }
 
+final_cleanup() {
+    # verify soll nichts Laufendes hinterlassen -- weder einen privilegierten
+    # Container mit veroeffentlichtem SSH-Port noch die Debian-Images.
+    "$REPO_ROOT/test/devenv/devenv" down >/dev/null 2>&1 || true
+    docker image rm -f "$DEBIAN_IMAGE" "${DEBIAN_IMAGE}-dockercom" >/dev/null 2>&1 || true
+}
+
+# Kein `a && b && c`: in einer solchen Verkettung ist `set -e` unterdrueckt,
+# ein fehlgeschlagenes verify_image beendete das Skript also nicht und der
+# Rueckgabewert war der des letzten Gliedes. Stattdessen ein Fehlerzaehler.
+rc=0
 case "${1:-all}" in
-    image)     verify_image ;;
-    lifecycle) verify_lifecycle ;;
-    fixtures)  verify_fixtures ;;
-    mount)     verify_mount ;;
-    distros)   verify_distros ;;
-    testmode)  verify_testmode ;;
-    all)       verify_image && verify_lifecycle && verify_fixtures && verify_mount && verify_distros && verify_testmode ;;
+    image)     verify_image     || rc=1 ;;
+    lifecycle) verify_lifecycle || rc=1 ;;
+    fixtures)  verify_fixtures  || rc=1 ;;
+    mount)     verify_mount     || rc=1 ;;
+    distros)   verify_distros   || rc=1 ;;
+    testmode)  verify_testmode  || rc=1 ;;
+    all)
+        for f in image lifecycle fixtures mount distros testmode; do
+            "verify_$f" || rc=1
+        done
+        ;;
     *)         echo "Unbekannt: $1" >&2; exit 2 ;;
 esac
-echo "alle Pruefungen bestanden"
+
+final_cleanup
+
+if [ "$rc" -eq 0 ]; then
+    echo "alle Pruefungen bestanden"
+else
+    echo "Pruefungen fehlgeschlagen" >&2
+fi
+exit "$rc"

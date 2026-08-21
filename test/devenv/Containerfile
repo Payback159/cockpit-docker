@@ -15,6 +15,13 @@ ARG DOCKER_SOURCE=distro
 ENV DEBIAN_FRONTEND=noninteractive
 ENV container=docker
 
+# Zum Paketblock unten -- beides sieht auf Ubuntu redundant aus, ist auf Debian
+# aber noetig; bitte nicht "aufraeumen":
+#   docker-cli: docker.io *empfiehlt* es nur, und --no-install-recommends wirft
+#   Empfehlungen weg, also braucht Debian es explizit. Auf Ubuntu ist docker-cli
+#   ein von docker.io bereitgestelltes virtuelles Paket -- die Angabe ist ein No-op.
+#   Compose-Kaskade: Ubuntu 26.04 kennt nur docker-compose-v2, Debian 13 nur
+#   docker-compose; docker-compose-plugin deckt weitere Distributionen ab.
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
         systemd systemd-sysv dbus \

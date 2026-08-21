@@ -56,11 +56,15 @@ function hint(error: DockerError): string {
     }
 }
 
-export const FatalErrorBanner: React.FC<{ error: DockerError }> = ({ error }) => (
-    <Alert variant={AlertVariant.danger} isInline title={title(error)}>
-        <p>{hint(error)}</p>
-        <p className="pf-v6-u-mt-sm">
-            <code>{error.raw}</code>
-        </p>
-    </Alert>
-);
+export const FatalErrorBanner: React.FC<{ error: DockerError }> = ({ error }) => {
+    const explanation = hint(error);
+
+    return (
+        <Alert variant={AlertVariant.danger} isInline title={title(error)}>
+            {explanation !== '' && <p>{explanation}</p>}
+            <p className="pf-v6-u-mt-sm">
+                <code>{error.raw}</code>
+            </p>
+        </Alert>
+    );
+};

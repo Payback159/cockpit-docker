@@ -28,13 +28,21 @@ import { superuser } from 'superuser';
 
 import {
     probeAccess, resetAccessMode, stream, checkSystem,
-    isDockerError, type AccessMode, type DockerError, type SystemInfo,
+    isDockerError, DockerError, type AccessMode, type SystemInfo,
 } from './client';
 
 /* Gemessen: ein `compose restart` mit zwei Services erzeugt 18 Ereignisse.
  * Ohne Entprellung waere ereignisgesteuertes Nachladen schlechter als das
  * fruehere Polling. */
 const DEBOUNCE_MS = 300;
+
+/* Kurzer Backoff, bevor nach einem abgerissenen docker-events-Stream neu
+ * verbunden wird. Bewusst ereignisgesteuert (ueber den onError-Callback von
+ * `stream()`) statt eines blinden Intervalls: ein Intervall, das den Stream
+ * unabhaengig von seinem Zustand alle N Sekunden schliesst und neu aufbaut,
+ * reisst auch einen gesunden Stream ab und verliert Ereignisse in der
+ * Luecke -- das war genau der Fehler, den dieser Umbau beheben soll. */
+const RECONNECT_DELAY_MS = 3000;
 
 type Listener = { types: string[]; cb: () => void };
 
@@ -67,6 +75,9 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const listeners = useRef<Set<Listener>>(new Set());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pending = useRef<Set<string>>(new Set());
+    // Rest einer am Chunk-Rand abgeschnittenen Zeile; cockpit.spawn().stream()
+    // liefert rohe Kanal-Chunks ohne Zeilenrahmung.
+    const remainder = useRef('');
 
     const subscribe = useCallback((types: string[], cb: () => void) => {
         const entry: Listener = { types, cb };
@@ -87,7 +98,14 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const onEvent = useCallback((chunk: string) => {
-        for (const line of chunk.split('\n')) {
+        // Vollstaendige Zeilen sofort verarbeiten; ein abgeschnittenes
+        // Fragment am Ende bleibt fuer den naechsten Chunk stehen, statt
+        // stillschweigend verworfen zu werden.
+        const combined = remainder.current + chunk;
+        const lines = combined.split('\n');
+        remainder.current = lines.pop() ?? '';
+
+        for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed === '')
                 continue;
@@ -95,9 +113,8 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const evt = JSON.parse(trimmed) as { Type?: string };
                 if (evt.Type)
                     pending.current.add(evt.Type);
-            } catch {
-                /* Teilzeile am Puffergrenze; die naechste Zustellung
-                 * bringt den Rest. */
+            } catch (err) {
+                console.warn('DockerProvider: konnte Ereigniszeile nicht parsen', trimmed, err);
             }
         }
         if (timer.current === null)
@@ -112,10 +129,28 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const m = await probeAccess({ superuserAllowed: superuser.allowed === true });
             setMode(m);
             setFatalError(null);
-            setSystemInfo(await checkSystem());
+            try {
+                setSystemInfo(await checkSystem());
+            } catch (err) {
+                // Der Zugriffsmodus steht fest; nur die Zusatzinfo fuer die
+                // Uebersicht blieb aus. Kein Grund, den ganzen Modus zu
+                // verwerfen und den Ereignisstrom zu verhindern -- aber der
+                // Fehler darf nicht wortlos verschwinden.
+                console.error('DockerProvider: checkSystem fehlgeschlagen', err);
+                setSystemInfo(null);
+            }
         } catch (err) {
             setMode(null);
-            setFatalError(isDockerError(err) ? err : null);
+            // Ein nicht klassifizierter Fehler darf den Modul-Zustand nicht
+            // unbeobachtet lassen (ready=true, fatalError=null wuerde jeden
+            // Tab freischalten, obwohl der Zugriff nie geklaert wurde).
+            if (isDockerError(err)) {
+                setFatalError(err);
+            } else {
+                console.error('DockerProvider: unerwarteter Fehler bei probeAccess', err);
+                const message = err instanceof Error ? err.message : String(err);
+                setFatalError(new DockerError('command-failed', message, null));
+            }
         } finally {
             setReady(true);
         }
@@ -136,22 +171,42 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return;
 
         let closed = false;
-        let handle = stream(['docker', 'events', '--format', 'json'], onEvent);
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        let handle: { close: () => void } = { close: () => {} };
 
-        // Reisst der Stream ab, neu aufbauen.
-        const retry = setInterval(() => {
+        function connect() {
+            remainder.current = '';
+            handle = stream(['docker', 'events', '--format', 'json'], onEvent, onStreamError);
+        }
+
+        // Der Stream endet nie von selbst; ein Abbruch (Daemon-Neustart,
+        // entzogene Rechte, unterbrochene Verbindung) laeuft immer hier
+        // auf -- nie stillschweigend verwerfen, sondern melden und mit
+        // kurzem Backoff neu verbinden.
+        function onStreamError(err: DockerError) {
             if (closed)
                 return;
-            handle.close();
-            handle = stream(['docker', 'events', '--format', 'json'], onEvent);
-        }, 60000);
+            console.warn('DockerProvider: docker-events-Stream abgebrochen, verbinde in',
+                          RECONNECT_DELAY_MS, 'ms neu', err);
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                if (!closed)
+                    connect();
+            }, RECONNECT_DELAY_MS);
+        }
+
+        connect();
 
         return () => {
             closed = true;
-            clearInterval(retry);
+            if (reconnectTimer !== null)
+                clearTimeout(reconnectTimer);
             handle.close();
-            if (timer.current !== null)
+            if (timer.current !== null) {
                 clearTimeout(timer.current);
+                timer.current = null;
+            }
+            pending.current.clear();
         };
     }, [ready, fatalError, mode, onEvent]);
 

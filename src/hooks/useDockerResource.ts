@@ -52,21 +52,36 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
     const loaderRef = useRef(loader);
     loaderRef.current = loader;
 
+    // Erhoeht sich bei jedem reload()-Aufruf. Ueberholt eine juengere
+    // Anfrage eine aeltere (z. B. `docker ps` unter Last laesst das
+    // 300-ms-Entprellfenster leicht platzen), darf nur die zum Zeitpunkt
+    // ihrer Ankunft noch aktuelle Generation den Zustand schreiben --
+    // sonst ueberschreibt eine spaet ankommende, aeltere Antwort frischere
+    // Daten mit veralteten.
+    const generation = useRef(0);
+
     const visible = opts.tab === undefined || opts.tab === activeTab;
 
     const reload = useCallback(async () => {
+        const gen = ++generation.current;
         if (loadedOnce.current)
             setRefreshing(true);
         try {
             const result = await loaderRef.current();
+            if (gen !== generation.current)
+                return;
             setData(result);
             setError(null);
         } catch (err) {
+            if (gen !== generation.current)
+                return;
             setError(isDockerError(err) ? err : (err as Error));
         } finally {
-            loadedOnce.current = true;
-            setLoading(false);
-            setRefreshing(false);
+            if (gen === generation.current) {
+                loadedOnce.current = true;
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     }, []);
 

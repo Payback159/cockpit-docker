@@ -29,7 +29,12 @@ import {
     EmptyStateBody
 } from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
@@ -239,28 +244,29 @@ export const ComposeImages: React.FC = () => {
                 <Modal
                     variant="small"
                     isOpen
-                    title={_("Remove unused images?")}
-                    aria-label={_("Remove unused images?")}
                     onClose={() => setConfirmCleanup(false)}
                 >
-                    <p>
-                        {cockpit.format(
-                            cockpit.ngettext(
-                                "This removes $0 image that no Compose project uses. This cannot be undone.",
-                                "This removes $0 images that no Compose project use. This cannot be undone.",
-                                unusedCount),
-                            unusedCount)}
-                    </p>
-                    <p>{_("These images are not shown in this list, because the list only shows images used by Compose projects.")}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <ModalHeader title={_("Remove unused images?")} />
+                    <ModalBody>
+                        <p>
+                            {cockpit.format(
+                                cockpit.ngettext(
+                                    "This removes $0 image that no Compose project uses. This cannot be undone.",
+                                    "This removes $0 images that no Compose project use. This cannot be undone.",
+                                    unusedCount),
+                                unusedCount)}
+                        </p>
+                        <p>{_("These images are not shown in this list, because the list only shows images used by Compose projects.")}</p>
+                    </ModalBody>
+                    <ModalFooter>
                         <Button
                             variant="danger"
                             onClick={() => { setConfirmCleanup(false); handleCleanupUnusedImages() }}
                         >
                             {_("Remove")}
-                        </Button>{' '}
+                        </Button>
                         <Button variant="link" onClick={() => setConfirmCleanup(false)}>{_("Cancel")}</Button>
-                    </div>
+                    </ModalFooter>
                 </Modal>
             )}
         </>

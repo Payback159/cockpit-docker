@@ -18,7 +18,12 @@
  */
 
 import React from 'react';
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import {
     DescriptionList,
@@ -56,20 +61,12 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
 
     return (
         <Modal
-            title={cockpit.format(_("Volume details: $0"), volume.Name)}
             isOpen={isOpen}
             onClose={onClose}
             width="60%"
         >
-            <div
-                style={{
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    background: 'var(--pf-v6-global--BackgroundColor--100)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--pf-v6-global--BorderColor--100)'
-                }}
-            >
+            <ModalHeader title={cockpit.format(_("Volume details: $0"), volume.Name)} />
+            <ModalBody>
                 <DescriptionList isHorizontal>
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("Name")}</DescriptionListTerm>
@@ -95,7 +92,7 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("Mountpoint")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            <code style={{ fontSize: '0.875rem' }}>{volume.Mountpoint}</code>
+                            <code className="ct-monospace-sm">{volume.Mountpoint}</code>
                         </DescriptionListDescription>
                     </DescriptionListGroup>
 
@@ -110,7 +107,7 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
                         <DescriptionListGroup>
                             <DescriptionListTerm>{_("Labels")}</DescriptionListTerm>
                             <DescriptionListDescription>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <div className="ct-label-row">
                                     {Object.entries(volume.Labels).map(([key, value]) => (
                                         <Label key={key} color="grey">
                                             {key}: {value}
@@ -125,7 +122,7 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
                         <DescriptionListGroup>
                             <DescriptionListTerm>{_("Options")}</DescriptionListTerm>
                             <DescriptionListDescription>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <div className="ct-label-row">
                                     {Object.entries(volume.Options).map(([key, value]) => (
                                         <Label key={key} color="orange">
                                             {key}: {value}
@@ -136,21 +133,13 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
                         </DescriptionListGroup>
                     )}
                 </DescriptionList>
-            </div>
+            </ModalBody>
 
-            {/* Footer with button */}
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    padding: '1rem',
-                    borderTop: '1px solid var(--pf-v6-global--BorderColor--100)'
-                }}
-            >
+            <ModalFooter>
                 <Button variant="primary" onClick={onClose}>
                     {_("Close")}
                 </Button>
-            </div>
+            </ModalFooter>
         </Modal>
     );
 };

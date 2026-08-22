@@ -62,7 +62,7 @@ export const FatalErrorBanner: React.FC<{ error: DockerError }> = ({ error }) =>
     return (
         <Alert variant={AlertVariant.danger} isInline title={title(error)}>
             {explanation !== '' && <p>{explanation}</p>}
-            <p className="pf-v6-u-mt-sm">
+            <p className="ct-block-spaced-sm">
                 <code>{error.raw}</code>
             </p>
         </Alert>

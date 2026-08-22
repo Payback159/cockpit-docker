@@ -55,6 +55,15 @@ RUN useradd -m -s /bin/bash -G sudo,docker devel \
     && useradd -m -s /bin/bash -G sudo admin \
     && echo 'admin:admin' | chpasswd
 
+# The module directory is a SYMLINK into the mounted checkout, not a bind mount
+# of dist/ itself. A bind mount resolves to an inode once, and build.js calls
+# cleanPlugin(), which removes dist/ and lets esbuild recreate it -- after any
+# rebuild the container would keep looking at the old, orphaned directory and
+# the module would vanish from Cockpit with "Not found". A symlink is resolved
+# on every access, so it survives the directory being replaced.
+RUN mkdir -p /usr/local/share/cockpit \
+    && ln -sfn /src/dist /usr/local/share/cockpit/cockpit-docker
+
 # No TLS: access happens exclusively over 127.0.0.1.
 RUN mkdir -p /etc/cockpit \
     && printf '[WebService]\nAllowUnencrypted=true\n' > /etc/cockpit/cockpit.conf

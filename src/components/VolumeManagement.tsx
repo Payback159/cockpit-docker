@@ -32,7 +32,12 @@ import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/inde
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { DatabaseIcon } from '@patternfly/react-icons';
 import TrashIcon from '@patternfly/react-icons/dist/esm/icons/trash-icon';
@@ -157,15 +162,7 @@ export const VolumeManagement: React.FC = () => {
                 {
                     title: (
                         <span
-                            style={{
-                                fontFamily: 'monospace',
-                                fontSize: '0.875rem',
-                                maxWidth: '300px',
-                                display: 'inline-block',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                            }}
+                            className="ct-truncate-path"
                             title={volume.Mountpoint}
                         >
                             {volume.Mountpoint}
@@ -175,7 +172,7 @@ export const VolumeManagement: React.FC = () => {
                 {
                     title: project !== '-'
                         ? <Label color="green">{project}</Label>
-                        : <span style={{ color: 'var(--pf-v6-global--Color--200)' }}>-</span>
+                        : <span className="ct-empty-value">-</span>
                 },
                 { title: formatDate(volume.CreatedAt) },
                 {
@@ -269,17 +266,18 @@ export const VolumeManagement: React.FC = () => {
                 <Modal
                     variant="small"
                     isOpen
-                    title={_("Remove this volume?")}
-                    aria-label={_("Remove this volume?")}
                     onClose={() => setConfirmRemove(null)}
                 >
-                    <p>{cockpit.format(_("Remove volume $0? This cannot be undone."), confirmRemove)}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <ModalHeader title={_("Remove this volume?")} />
+                    <ModalBody>
+                        <p>{cockpit.format(_("Remove volume $0? This cannot be undone."), confirmRemove)}</p>
+                    </ModalBody>
+                    <ModalFooter>
                         <Button variant="danger" onClick={() => { const n = confirmRemove; setConfirmRemove(null); handleRemoveVolume(n) }}>
                             {_("Remove")}
-                        </Button>{' '}
+                        </Button>
                         <Button variant="link" onClick={() => setConfirmRemove(null)}>{_("Cancel")}</Button>
-                    </div>
+                    </ModalFooter>
                 </Modal>
             )}
 
@@ -287,18 +285,19 @@ export const VolumeManagement: React.FC = () => {
                 <Modal
                     variant="small"
                     isOpen
-                    title={_("Remove all unused volumes?")}
-                    aria-label={_("Remove all unused volumes?")}
                     onClose={() => setConfirmPrune(false)}
                 >
-                    <p>{_("This removes every volume not used by at least one container. This cannot be undone.")}</p>
-                    <p>{_("This also removes volumes not shown in this list, because they do not belong to a Compose project.")}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <ModalHeader title={_("Remove all unused volumes?")} />
+                    <ModalBody>
+                        <p>{_("This removes every volume not used by at least one container. This cannot be undone.")}</p>
+                        <p>{_("This also removes volumes not shown in this list, because they do not belong to a Compose project.")}</p>
+                    </ModalBody>
+                    <ModalFooter>
                         <Button variant="danger" onClick={() => { setConfirmPrune(false); handlePruneVolumes() }}>
                             {_("Prune")}
-                        </Button>{' '}
+                        </Button>
                         <Button variant="link" onClick={() => setConfirmPrune(false)}>{_("Cancel")}</Button>
-                    </div>
+                    </ModalFooter>
                 </Modal>
             )}
         </>

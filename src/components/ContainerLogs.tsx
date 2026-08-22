@@ -19,7 +19,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import cockpit from 'cockpit';
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { CodeBlock, CodeBlockCode } from "@patternfly/react-core/dist/esm/components/CodeBlock/index.js";
@@ -169,70 +174,42 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
     return (
         <Modal
             width="85%"
-            title={_("Container Logs: ") + containerName}
             isOpen={isOpen}
             onClose={handleClose}
         >
-            {/* Toolbar oben */}
-            <div
-                style={{
-                    display: 'flex',
-                    gap: '1.5rem',
-                    alignItems: 'center',
-                    padding: '0.5rem 0',
-                    borderBottom: '1px solid var(--pf-t--global--border--color--default)',
-                    marginBottom: '0.75rem'
-                }}
-            >
-                <Checkbox
+            <ModalHeader title={cockpit.format(_("Container logs: $0"), containerName)} />
+            <ModalBody>
+                {/* Toolbar */}
+                <div className="ct-panel-header ct-panel-header--toolbar">
+                    <Checkbox
                     id="follow-logs"
                     label={follow ? _("Following logs...") : _("Follow logs")}
                     isChecked={follow}
                     onChange={(_event, checked) => setFollow(checked)}
-                />
-                {follow && (
-                    <span
-                        style={{
-                            fontSize: '0.875rem',
-                            color: 'var(--pf-t--global--icon--color--status--success--default)',
-                            fontWeight: 600
-                        }}
-                    >
-                        🟢 Live
-                    </span>
-                )}
-            </div>
+                    />
+                    {follow && (
+                        <span className="ct-live-indicator">
+                            🟢 Live
+                        </span>
+                    )}
+                </div>
 
-            {/* Logs Content */}
-            <div
+                {/* Logs Content */}
+                <div
                 ref={logsContainerRef}
-                style={{
-                    height: 'calc(85vh - 160px)',
-                    overflow: 'auto',
-                    background: 'var(--pf-t--global--background--color--secondary--default)',
-                    borderRadius: '8px',
-                    padding: '1rem',
-                    marginBottom: '1rem'
-                }}
-            >
-                <CodeBlock>
-                    <CodeBlockCode style={{ fontSize: '13px', lineHeight: '1.4', fontFamily: 'monospace' }}>
-                        {loading && !logs ? _("Loading logs...") : logs || _("No logs available")}
-                        <div ref={logsEndRef} />
-                    </CodeBlockCode>
-                </CodeBlock>
-            </div>
+                className="ct-scroll-pane"
+                >
+                    <CodeBlock>
+                        <CodeBlockCode className="ct-code-logs">
+                            {loading && !logs ? _("Loading logs...") : logs || _("No logs available")}
+                            <div ref={logsEndRef} />
+                        </CodeBlockCode>
+                    </CodeBlock>
+                </div>
 
-            {/* Footer with buttons */}
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '0.5rem',
-                    padding: '1rem',
-                    borderTop: '1px solid var(--pf-t--global--border--color--default)'
-                }}
-            >
+            </ModalBody>
+
+            <ModalFooter>
                 <Button
                     variant="secondary"
                     icon={<DownloadIcon />}
@@ -245,7 +222,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 <Button variant="primary" onClick={handleClose} size="sm">
                     {_("Close")}
                 </Button>
-            </div>
+            </ModalFooter>
         </Modal>
     );
 };

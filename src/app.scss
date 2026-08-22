@@ -1,9 +1,5 @@
 @use "page.scss";
 
-p {
-    font-weight: bold;
-}
-
 // Remove default padding from Tabs and content to align with left edge like cockpit-machines
 .no-masthead-sidebar .pf-v6-c-tabs {
     padding: 0;
@@ -23,9 +19,21 @@ p {
     margin-right: 0;
 }
 
+// Spacing between stacked blocks inside a tab. PatternFly's pf-v6-u-mt-*
+// utilities would do this, but their stylesheet is not bundled: page.scss
+// imports @patternfly/patternfly/base only, and pulling in the full Spacing
+// utilities costs ~100 kB for a handful of margins.
+.ct-block-spaced {
+    margin-top: var(--pf-t--global--spacer--md);
+}
+
+.ct-block-spaced-sm {
+    margin-top: var(--pf-t--global--spacer--sm);
+}
+
 // Compose Projects Styling
 #compose-projects {
-    margin-top: var(--pf-v6-global--spacer--md);
+    margin-top: var(--pf-t--global--spacer--md);
 
     .pf-v6-c-card__body.contains-list {
         padding: 0;
@@ -42,22 +50,14 @@ p {
     // Ensure action buttons are visible
     .pf-v6-c-table__action {
         text-align: right;
-        padding-right: var(--pf-v6-global--spacer--md);
+        padding-right: var(--pf-t--global--spacer--md);
     }
 }
 
-// Compose Containers Styling - Group containers by project
-#compose-containers-notenschluessel,
-#compose-containers-nanonote,
-#compose-containers-whoogle,
-#compose-containers-stirling-pdf,
-#compose-containers-homarr,
-#compose-containers-gluetun,
-#compose-containers-recyclarr,
-#compose-containers-homepage,
-#compose-containers-authentik,
+// Compose Containers Styling - one block per project, ids are built from the
+// project name at runtime.
 [id^="compose-containers-"] {
-    margin-top: var(--pf-v6-global--spacer--md);
+    margin-top: var(--pf-t--global--spacer--md);
 
     // Column widths for containers table
     .pf-v6-c-table {
@@ -72,7 +72,7 @@ p {
 
 // Images Styling
 #compose-images {
-    margin-top: var(--pf-v6-global--spacer--md);
+    margin-top: var(--pf-t--global--spacer--md);
 
     // Column widths for images table
     .pf-v6-c-table {
@@ -85,3 +85,144 @@ p {
     }
 }
 
+// Resource summary tiles on the Overview tab
+.ct-resource-tile {
+    height: 100%;
+
+    &__stack {
+        height: 100%;
+    }
+
+    // Each tile shares the row evenly but stops collapsing below a readable width
+    &__slot {
+        min-width: 200px;
+    }
+
+    &__label {
+        color: var(--pf-t--global--text--color--subtle);
+        font-size: var(--pf-t--global--font--size--sm);
+        font-weight: 500;
+    }
+
+    &__icon {
+        font-size: var(--pf-t--global--font--size--xl);
+    }
+
+    &__count {
+        color: var(--pf-t--global--text--color--brand--default);
+        font-size: var(--pf-t--global--font--size--3xl);
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    &__details {
+        color: var(--pf-t--global--text--color--subtle);
+        font-size: var(--pf-t--global--font--size--xs);
+    }
+}
+
+// Monospaced values that are not code blocks (mount points, volume names)
+.ct-monospace-sm {
+    font-size: var(--pf-t--global--font--size--sm);
+}
+
+// Horizontal separation between a label and the text that follows it
+.ct-inline-spaced {
+    margin-left: var(--pf-t--global--spacer--md);
+}
+
+.ct-inline-spaced-sm {
+    margin-left: var(--pf-t--global--spacer--sm);
+}
+
+// A file system path in a table cell: monospaced, and cut off with an ellipsis
+// rather than stretching the column. The full value is in the title attribute.
+.ct-truncate-path {
+    display: inline-block;
+    font-family: var(--pf-t--global--font--family--mono);
+    font-size: var(--pf-t--global--font--size--sm);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+// Muted placeholder where a table cell has no value
+.ct-empty-value {
+    color: var(--pf-t--global--text--color--subtle);
+}
+
+// Labels that wrap onto further lines instead of stretching their container
+.ct-label-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--pf-t--global--spacer--sm);
+}
+
+// A header row above a panel, separated by a rule
+.ct-panel-header {
+    align-items: center;
+    border-bottom: 1px solid var(--pf-t--global--border--color--default);
+    display: flex;
+    margin-bottom: var(--pf-t--global--spacer--sm);
+    padding: var(--pf-t--global--spacer--sm) 0;
+
+    // Wider gaps when the header carries controls rather than a single label
+    &--toolbar {
+        gap: var(--pf-t--global--spacer--lg);
+    }
+
+    &__path {
+        color: var(--pf-t--global--text--color--subtle);
+        font-family: var(--pf-t--global--font--family--mono);
+        font-size: var(--pf-t--global--font--size--sm);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.ct-centered-status {
+    padding: var(--pf-t--global--spacer--xl);
+    text-align: center;
+}
+
+.ct-live-indicator {
+    color: var(--pf-t--global--icon--color--status--success--default);
+    font-size: var(--pf-t--global--font--size--sm);
+    font-weight: 600;
+}
+
+// Log and file viewers: a scrolling, code-like surface.
+//
+// The pane scrolls itself rather than letting the whole ModalBody scroll.
+// Otherwise anything above it -- the log viewer's "Follow logs" toggle --
+// scrolls out of reach as soon as the content is long. Viewport-relative so
+// it adapts to the window; if the modal ends up shorter than this, ModalBody
+// takes over the scrolling.
+.ct-scroll-pane {
+    background-color: var(--pf-t--global--background--color--secondary--default);
+    border-radius: var(--pf-t--global--border--radius--medium);
+    margin-bottom: var(--pf-t--global--spacer--md);
+    max-height: 60vh;
+    overflow: auto;
+    padding: var(--pf-t--global--spacer--md);
+}
+
+.ct-code-file,
+.ct-code-logs {
+    font-size: var(--pf-t--global--font--size--sm);
+}
+
+.ct-code-file {
+    line-height: 1.6;
+}
+
+.ct-code-logs {
+    font-family: var(--pf-t--global--font--family--mono);
+    line-height: 1.4;
+}
+
+.ct-code-pre {
+    margin: 0;
+}

@@ -1,0 +1,131 @@
+#!/bin/sh
+# Fails when this module's own styling references something that does not exist.
+#
+# Two ways for a style to do nothing at all while everything still builds and
+# every test passes:
+#
+#   1. A CSS custom property referenced but never defined. PatternFly 6 renamed
+#      its tokens from `--pf-v6-global--*` to `--pf-t--global--*`, and `var()`
+#      on an undefined property makes the whole declaration invalid, so the
+#      rule silently has no effect.
+#   2. A `pf-v6-u-*` utility class used in the markup whose stylesheet was
+#      never bundled. PatternFly ships those utilities separately from `base`,
+#      which is all pkg/lib/page.scss imports.
+#
+# Both were live defects in this module before this check existed: fifteen
+# references to six token names, none of which PatternFly 6 defines, and five
+# uses of two utility classes that reached no stylesheet.
+#
+# Scope is deliberately `src/` only. The bundle also contains PatternFly's and
+# Cockpit's own CSS, which references plenty of properties that a modifier
+# class sets conditionally or that carry a fallback -- those are neither broken
+# nor ours to fix, and flagging them would bury the findings that matter.
+#
+# Reads dist/, so `make` has to have run first.
+set -eu
+
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+CSS=$REPO_ROOT/dist/index.css
+JS=$REPO_ROOT/dist/index.js
+SRC=$REPO_ROOT/src
+
+for f in "$CSS" "$JS"; do
+    [ -f "$f" ] || {
+        echo "missing: $f -- run 'make' first" >&2
+        exit 1
+    }
+done
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+failed=0
+
+# --- 1. custom properties referenced by src/ but never defined ---------------
+#
+# `var(--x, fallback)` is not a defect: the fallback applies. Only bare
+# `var(--x)` references are collected, so the trailing character has to be a
+# closing parenthesis.
+grep -rhoE 'var\(--[A-Za-z0-9_-]+\)' "$SRC" 2>/dev/null |
+    sed 's/^var(//; s/)$//' | sort -u > "$tmp/refs"
+
+# Definitions come from the whole bundle: PatternFly defines its tokens there,
+# and so does our own app.scss.
+grep -ohE '\-\-[A-Za-z0-9_-]+[[:space:]]*:' "$CSS" "$JS" |
+    grep -oE '\-\-[A-Za-z0-9_-]+' | sort -u > "$tmp/defs"
+
+comm -23 "$tmp/refs" "$tmp/defs" > "$tmp/undefined"
+
+if [ -s "$tmp/undefined" ]; then
+    echo "Custom properties referenced in src/ but never defined:" >&2
+    sed 's/^/  /' "$tmp/undefined" >&2
+    echo "" >&2
+    echo "A var() on an undefined property makes the declaration invalid, so the" >&2
+    echo "style silently does nothing. PatternFly 6 names its tokens" >&2
+    echo "--pf-t--global--*, not --pf-v6-global--*." >&2
+    failed=1
+fi
+
+# --- 2. utility classes used in src/ but not bundled -------------------------
+#
+# Only pf-v6-u-* (PatternFly utilities). Component classes come from the
+# component CSS, which react-core bundles automatically.
+# Only lines that actually apply a class: a `pf-v6-u-` prefix inside a comment
+# is prose, not markup, and flagging it would be a false alarm.
+grep -rh 'className' "$SRC" 2>/dev/null |
+    grep -oE 'pf-v6-u-[a-zA-Z0-9_-]*[a-zA-Z0-9]' | sort -u > "$tmp/used"
+
+: > "$tmp/missing"
+while read -r cls; do
+    [ -n "$cls" ] || continue
+    grep -q "\.$cls" "$CSS" || echo "$cls" >> "$tmp/missing"
+done < "$tmp/used"
+
+if [ -s "$tmp/missing" ]; then
+    echo "Utility classes used in src/ but absent from the bundle:" >&2
+    sed 's/^/  /' "$tmp/missing" >&2
+    echo "" >&2
+    echo "PatternFly ships its utilities separately from 'base'. Either import" >&2
+    echo "the stylesheet that defines them, or use a token or a layout" >&2
+    echo "component instead." >&2
+    failed=1
+fi
+
+# --- 3. modals still built on the PatternFly 5 API ---------------------------
+#
+# PatternFly 6 removed `title` from Modal and expects ModalHeader / ModalBody /
+# ModalFooter as children. `ModalProps extends React.HTMLProps<HTMLDivElement>`,
+# so a stray `title` still type-checks -- it just becomes the HTML title
+# attribute, a mouse-over tooltip, and no heading is rendered. Without
+# ModalBody there is no scrolling region either, so long content is clipped by
+# the modal box and the footer is pushed out of sight. Seven dialogs in this
+# module were built that way, and nothing caught it.
+#
+# Matched per file: a file that opens a <Modal must also use ModalBody, and
+# `title=` must never appear within a few lines of the opening tag.
+: > "$tmp/modal_problems"
+for f in $(grep -rl '<Modal' "$SRC" 2>/dev/null); do
+    grep -q 'ModalBody' "$f" ||
+        echo "  $(basename "$f"): uses <Modal> without ModalBody" >> "$tmp/modal_problems"
+    grep -A6 '<Modal$' "$f" | grep -q '^\s*title=' &&
+        echo "  $(basename "$f"): passes title= to <Modal> (belongs on ModalHeader)" >> "$tmp/modal_problems"
+done
+
+if [ -s "$tmp/modal_problems" ]; then
+    echo "Modals built on the PatternFly 5 API:" >&2
+    cat "$tmp/modal_problems" >&2
+    echo "" >&2
+    echo "PatternFly 6 wants <ModalHeader title=... />, <ModalBody> and" >&2
+    echo "<ModalFooter>. A title on <Modal> becomes an HTML tooltip attribute" >&2
+    echo "and renders no heading." >&2
+    failed=1
+fi
+
+if [ "$failed" -eq 0 ]; then
+    n_refs=$(wc -l < "$tmp/refs")
+    n_used=$(wc -l < "$tmp/used")
+    n_modals=$(grep -rl '<Modal' "$SRC" 2>/dev/null | wc -l)
+    echo "css: $n_refs custom propert$([ "$n_refs" -eq 1 ] && echo y || echo ies) and $n_used utility class$([ "$n_used" -eq 1 ] && echo "" || echo es) referenced by src/, all resolved"
+    echo "modals: $n_modals file$([ "$n_modals" -eq 1 ] && echo "" || echo s) use the PatternFly 6 composition"
+fi
+exit "$failed"

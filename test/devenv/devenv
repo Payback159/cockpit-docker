@@ -83,6 +83,10 @@ up)
     build
     # IMPORTANT: no --tmpfs or cgroup mounts (systemd otherwise dies with 255).
     # Two named volumes, otherwise overlay-on-overlay when starting containers.
+    #
+    # The checkout is mounted whole at /src, and the image symlinks the module
+    # directory to /src/dist. Mounting dist/ directly would bind one inode, and
+    # every rebuild replaces that directory -- see the Containerfile.
     ssh_opt=""
     [ "$WITH_SSH" -eq 1 ] && ssh_opt="-p 127.0.0.1:$SSH_PORT:22"
     # shellcheck disable=SC2086
@@ -91,7 +95,7 @@ up)
         -p "127.0.0.1:$PORT:9090" $ssh_opt \
         -v "$VOL_DOCKER:/var/lib/docker" \
         -v "$VOL_CONTAINERD:/var/lib/containerd" \
-        -v "$REPO_ROOT/dist:/usr/local/share/cockpit/cockpit-docker:ro" \
+        -v "$REPO_ROOT:/src:ro" \
         -v "$REPO_ROOT/test/fixtures:/srv/fixtures:ro" \
         "$IMAGE" >/dev/null
     wait_ready

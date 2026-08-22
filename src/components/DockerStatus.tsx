@@ -84,7 +84,7 @@ export const DockerStatus: React.FC = () => {
                                                 {_("Installed")}
                                             </Label>
                                             {systemInfo.docker.version && (
-                                                <span style={{ marginLeft: '1rem' }}>
+                                                <span className="ct-inline-spaced">
                                                     {_("Version")}: {systemInfo.docker.version}
                                                 </span>
                                             )}
@@ -100,7 +100,7 @@ export const DockerStatus: React.FC = () => {
                                                     variant={AlertVariant.warning}
                                                     isInline
                                                     title={_("Docker not found")}
-                                                    style={{ marginTop: '0.5rem' }}
+                                                    className="ct-block-spaced-sm"
                                                 >
                                                     {systemInfo.docker.error}
                                                 </Alert>
@@ -120,12 +120,12 @@ export const DockerStatus: React.FC = () => {
                                                 {_("Installed")}
                                             </Label>
                                             {systemInfo.compose.version && (
-                                                <span style={{ marginLeft: '1rem' }}>
+                                                <span className="ct-inline-spaced">
                                                     {_("Version")}: {systemInfo.compose.version}
                                                 </span>
                                             )}
                                             {systemInfo.compose.isPlugin && (
-                                                <Label color="blue" style={{ marginLeft: '0.5rem' }}>
+                                                <Label color="blue" className="ct-inline-spaced-sm">
                                                     {_("Plugin")}
                                                 </Label>
                                             )}
@@ -141,7 +141,7 @@ export const DockerStatus: React.FC = () => {
                                                     variant={AlertVariant.warning}
                                                     isInline
                                                     title={_("Docker Compose v1 is not supported")}
-                                                    style={{ marginTop: '0.5rem' }}
+                                                    className="ct-block-spaced-sm"
                                                 >
                                                     {cockpit.format(
                                                         _("Found the legacy 'docker-compose'$0. This module requires the Docker Compose v2 plugin."),
@@ -159,7 +159,7 @@ export const DockerStatus: React.FC = () => {
                                                         variant={AlertVariant.warning}
                                                         isInline
                                                         title={_("Docker Compose not found")}
-                                                        style={{ marginTop: '0.5rem' }}
+                                                        className="ct-block-spaced-sm"
                                                     >
                                                         {systemInfo.compose.error}
                                                     </Alert>
@@ -175,7 +175,7 @@ export const DockerStatus: React.FC = () => {
                             variant={AlertVariant.info}
                             isInline
                             title={_("Installation required")}
-                            style={{ marginTop: '1rem' }}
+                            className="ct-block-spaced"
                         >
                             {_("Docker needs to be installed on this system to use this module. Please install Docker Engine and Docker Compose plugin.")}
                         </Alert>

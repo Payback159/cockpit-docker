@@ -70,7 +70,7 @@ export const DockerStatus: React.FC = () => {
         <>
             {dockerInstalled && <DockerResources />}
 
-            <Card>
+            <Card id="docker-system-status">
                 <CardTitle>{_("Docker System Status")}</CardTitle>
                 <CardBody>
                     <DescriptionList isHorizontal>

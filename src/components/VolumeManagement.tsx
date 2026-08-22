@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import cockpit from 'cockpit';
 import {
     Card,
@@ -29,12 +29,10 @@ import {
     EmptyStateBody
 } from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
-import {
-    Alert,
-    AlertVariant
-} from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { DatabaseIcon } from '@patternfly/react-icons';
 import TrashIcon from '@patternfly/react-icons/dist/esm/icons/trash-icon';
@@ -42,74 +40,47 @@ import InfoCircleIcon from '@patternfly/react-icons/dist/esm/icons/info-circle-i
 import BroomIcon from '@patternfly/react-icons/dist/esm/icons/broom-icon';
 import { ListingTable } from "cockpit-components-table.jsx";
 import { VolumeDetails } from './VolumeDetails';
+import { ActionError } from './ActionError';
+import { DockerActionButton } from './DockerActionButton';
 
-import {
-    listVolumes,
-    removeVolume,
-    pruneVolumes,
-    type DockerVolume
-} from '../docker';
+import { listVolumes, removeVolume, pruneVolumes, type DockerVolume } from '../client';
+import { useDockerResource } from '../hooks/useDockerResource';
 
 const _ = cockpit.gettext;
 
 export const VolumeManagement: React.FC = () => {
-    const [volumes, setVolumes] = useState<DockerVolume[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data: volumes, loading, error, reload } = useDockerResource(
+        () => listVolumes(),
+        { events: ['volume'], tab: 4 });
+    const [actionError, setActionError] = useState<Error | null>(null);
     const [actionInProgress, setActionInProgress] = useState<string | null>(null);
-    const [detailsVolume, setDetailsVolume] = useState<string | null>(null);
+    const [detailsVolume, setDetailsVolume] = useState<DockerVolume | null>(null);
+    const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+    const [confirmPrune, setConfirmPrune] = useState(false);
 
-    const loadVolumes = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const volumeList = await listVolumes();
-            setVolumes(volumeList);
-        } catch (err) {
-            console.error('Failed to load volumes:', err);
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadVolumes();
-        // Refresh every 30 seconds
-        const interval = setInterval(loadVolumes, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    const shown = React.useMemo(
+        () => (volumes ?? []).filter(v => !!v.Labels['com.docker.compose.project']),
+        [volumes]);
 
     const handleRemoveVolume = async (volumeName: string) => {
-        if (!confirm(_(`Are you sure you want to remove volume "${volumeName}"? This action cannot be undone.`))) {
-            return;
-        }
-
         setActionInProgress(volumeName);
         try {
             await removeVolume(volumeName, false);
-            await loadVolumes();
+            await reload();
         } catch (err) {
-            console.error('Failed to remove volume:', err);
-            setError(_(`Failed to remove volume: ${err instanceof Error ? err.message : String(err)}`));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setActionInProgress(null);
         }
     };
 
     const handlePruneVolumes = async () => {
-        if (!confirm(_("Are you sure you want to remove all unused volumes? This action cannot be undone."))) {
-            return;
-        }
-
         setActionInProgress('prune');
         try {
-            const result = await pruneVolumes(true);
-            console.log('Prune result:', result);
-            await loadVolumes();
+            await pruneVolumes();
+            await reload();
         } catch (err) {
-            console.error('Failed to prune volumes:', err);
-            setError(_(`Failed to prune volumes: ${err instanceof Error ? err.message : String(err)}`));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setActionInProgress(null);
         }
@@ -141,7 +112,9 @@ export const VolumeManagement: React.FC = () => {
         return (
             <Card>
                 <CardBody>
-                    <Spinner size="lg" /> {_("Loading volumes...")}
+                    <Bullseye>
+                        <Spinner size="xl" />
+                    </Bullseye>
                 </CardBody>
             </Card>
         );
@@ -149,21 +122,12 @@ export const VolumeManagement: React.FC = () => {
 
     if (error) {
         return (
-            <Alert variant={AlertVariant.danger} title={_("Error loading volumes")}>
-                {error}
-            </Alert>
-        );
-    }
-
-    if (volumes.length === 0) {
-        return (
             <Card>
                 <CardBody>
                     <EmptyState>
-                        <DatabaseIcon />
-                        <h4>{_("No volumes found")}</h4>
                         <EmptyStateBody>
-                            {_("There are no Docker volumes on this system.")}
+                            <strong>{_("Error loading volumes")}</strong><br />
+                            {error.message}
                         </EmptyStateBody>
                     </EmptyState>
                 </CardBody>
@@ -181,7 +145,7 @@ export const VolumeManagement: React.FC = () => {
         { title: "", props: { "aria-label": _("Actions") } }
     ];
 
-    const rows = volumes.map((volume) => {
+    const rows = shown.map((volume) => {
         const isActionInProgress = actionInProgress === volume.Name;
         const project = getProjectLabel(volume.Labels);
 
@@ -223,21 +187,21 @@ export const VolumeManagement: React.FC = () => {
                                     size="sm"
                                     icon={<InfoCircleIcon />}
                                     isDisabled={isActionInProgress}
-                                    onClick={() => setDetailsVolume(volume.Name)}
+                                    onClick={() => setDetailsVolume(volume)}
                                 >
                                     {_("Details")}
                                 </Button>
                             </FlexItem>
                             <FlexItem>
-                                <Button
+                                <DockerActionButton
                                     variant="danger"
                                     size="sm"
                                     icon={<TrashIcon />}
                                     isDisabled={isActionInProgress}
-                                    onClick={() => handleRemoveVolume(volume.Name)}
+                                    onClick={() => setConfirmRemove(volume.Name)}
                                 >
                                     {_("Remove")}
-                                </Button>
+                                </DockerActionButton>
                             </FlexItem>
                         </Flex>
                     )
@@ -256,36 +220,83 @@ export const VolumeManagement: React.FC = () => {
                             {_("Docker Volumes")}
                         </FlexItem>
                         <FlexItem>
-                            <Button
+                            <DockerActionButton
                                 variant="warning"
                                 size="sm"
                                 icon={<BroomIcon />}
                                 isDisabled={!!actionInProgress}
-                                onClick={handlePruneVolumes}
+                                onClick={() => setConfirmPrune(true)}
                             >
                                 {_("Prune Unused")}
-                            </Button>
+                            </DockerActionButton>
                         </FlexItem>
                     </Flex>
                 </CardTitle>
                 <CardBody className="contains-list">
-                    <ListingTable
-                        variant="compact"
-                        gridBreakPoint="grid-md"
-                        emptyCaption={_("No volumes")}
-                        aria-label={_("Docker Volumes")}
-                        columns={columnTitles}
-                        rows={rows}
-                    />
+                    <ActionError error={actionError} onDismiss={() => setActionError(null)} />
+                    {shown.length === 0
+                        ? (
+                            <EmptyState>
+                                <DatabaseIcon />
+                                <h4>{_("No volumes found")}</h4>
+                                <EmptyStateBody>
+                                    {_("There are no Docker volumes used by Compose projects on this system.")}
+                                </EmptyStateBody>
+                            </EmptyState>
+                        )
+                        : (
+                            <ListingTable
+                                variant="compact"
+                                gridBreakPoint="grid-md"
+                                emptyCaption={_("No volumes")}
+                                aria-label={_("Docker Volumes")}
+                                columns={columnTitles}
+                                rows={rows}
+                            />
+                        )}
                 </CardBody>
             </Card>
 
             {detailsVolume && (
                 <VolumeDetails
-                    volumeName={detailsVolume}
+                    volume={detailsVolume}
                     isOpen={!!detailsVolume}
                     onClose={() => setDetailsVolume(null)}
                 />
+            )}
+
+            {confirmRemove && (
+                <Modal
+                    variant="small"
+                    isOpen
+                    title={_("Remove this volume?")}
+                    onClose={() => setConfirmRemove(null)}
+                >
+                    <p>{cockpit.format(_("Remove volume $0? This cannot be undone."), confirmRemove)}</p>
+                    <div className="pf-v6-u-mt-md">
+                        <Button variant="danger" onClick={() => { const n = confirmRemove; setConfirmRemove(null); handleRemoveVolume(n) }}>
+                            {_("Remove")}
+                        </Button>{' '}
+                        <Button variant="link" onClick={() => setConfirmRemove(null)}>{_("Cancel")}</Button>
+                    </div>
+                </Modal>
+            )}
+
+            {confirmPrune && (
+                <Modal
+                    variant="small"
+                    isOpen
+                    title={_("Remove all unused volumes?")}
+                    onClose={() => setConfirmPrune(false)}
+                >
+                    <p>{_("This removes every volume not used by at least one container. This cannot be undone.")}</p>
+                    <div className="pf-v6-u-mt-md">
+                        <Button variant="danger" onClick={() => { setConfirmPrune(false); handlePruneVolumes() }}>
+                            {_("Prune")}
+                        </Button>{' '}
+                        <Button variant="link" onClick={() => setConfirmPrune(false)}>{_("Cancel")}</Button>
+                    </div>
+                </Modal>
             )}
         </>
     );

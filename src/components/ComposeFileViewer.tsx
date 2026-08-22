@@ -32,7 +32,7 @@ import yaml from 'highlight.js/lib/languages/yaml';
 import 'highlight.js/styles/github-dark.css';
 
 import cockpit from 'cockpit';
-import { readComposeFile } from '../docker';
+import { readComposeFile } from '../client';
 
 // Register YAML language
 hljs.registerLanguage('yaml', yaml);
@@ -76,7 +76,15 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                 const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
                 setHighlightedCode(highlighted);
             } catch (err) {
-                setError(err instanceof Error ? err.message : String(err));
+                // readComposeFile() gibt weiter, was cockpit.file().read()
+                // ablehnt -- ein BasicError des Kanals, kein DockerError.
+                // Er ist keine Error-Instanz, traegt aber ein .message-Feld.
+                const message = err instanceof Error
+                    ? err.message
+                    : (err !== null && typeof err === 'object' && 'message' in err
+                        ? String((err as { message: unknown }).message)
+                        : String(err));
+                setError(message);
             } finally {
                 setLoading(false);
             }
@@ -105,7 +113,7 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
 
     return (
         <Modal
-            title={_(`Compose File: ${projectName}`)}
+            title={cockpit.format(_("Compose file: $0"), projectName)}
             isOpen={isOpen}
             onClose={handleClose}
             width="85%"
@@ -160,10 +168,9 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                     <CodeBlock>
                         <CodeBlockCode style={{ fontSize: '13px', lineHeight: '1.6' }}>
                             <pre style={{ margin: 0 }}>
-                                <code
-                                    className="hljs language-yaml"
-                                    dangerouslySetInnerHTML={{ __html: highlightedCode || content }}
-                                />
+                                {highlightedCode
+                                    ? <code className="hljs language-yaml" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+                                    : <code className="hljs language-yaml">{content}</code>}
                             </pre>
                         </CodeBlockCode>
                     </CodeBlock>

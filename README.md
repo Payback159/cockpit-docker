@@ -91,6 +91,19 @@ Violations of some rules can be fixed automatically by:
 
 Rules configuration can be found in the `.eslintrc.json` file.
 
+**Careful:** `test/common/static-code` gates both eslint and stylelint (see
+below) on `test -x node_modules/.bin/eslint -a -x /usr/bin/node` (and the
+stylelint equivalent). Where that path does not exist — for example if you
+run Node from nvm or another version manager — `make codecheck` silently
+skips both checks and still exits 0. Either create the symlink once:
+
+    sudo ln -sfn "$(command -v node)" /usr/bin/node
+
+or run `npm run eslint` and `npm run stylelint` directly, as described here
+and below. `.github/workflows/test.yml` creates the symlink and additionally
+guards against the silent-skip case, failing the job if either check did not
+run.
+
 ## Running stylelint
 
 Cockpit uses [Stylelint](https://stylelint.io/) to automatically check CSS code
@@ -107,6 +120,9 @@ Violations of some rules can be fixed automatically by:
     npm run stylelint:fix
 
 Rules configuration can be found in the `.stylelintrc.json` file.
+
+The same `/usr/bin/node` caveat from the eslint section above applies here:
+`test/common/static-code` gates both checks on it.
 
 # Local development environment
 
@@ -232,16 +248,28 @@ You can also run the test against a different Cockpit image, for example:
 
 # Running tests in CI
 
-These tests can be run in [Cirrus CI](https://cirrus-ci.org/), on their free
+[GitHub Actions](https://github.com/features/actions) runs on every pull
+request (and on pushes to `main`); see
+[.github/workflows/test.yml](.github/workflows/test.yml). It runs `make test`
+on Node 20 and Node 24, and, on Node 24, `make` followed by `make codecheck`
+— failing the job if that guard (see "Running eslint" above) finds that
+eslint or stylelint was silently skipped.
+
+The integration tests described below are covered by Cirrus CI and Packit
+instead, not by GitHub Actions.
+
+These tests can also be run in [Cirrus CI](https://cirrus-ci.org/), on their free
 [Linux Containers](https://cirrus-ci.org/guide/linux/) environment which
 explicitly supports `/dev/kvm`. Please see [Quick
 Start](https://cirrus-ci.org/guide/quick-start/) how to set up Cirrus CI for
 your project after forking from starter-kit.
 
-The included [.cirrus.yml](./.cirrus.yml) runs the integration tests for two
-operating systems (Fedora and CentOS 8). Note that if/once your project grows
-bigger, or gets frequent changes, you may need to move to a paid account, or
-different infrastructure with more capacity.
+The Cirrus CI configuration is present in this repository, but disabled, as
+[.cirrus.yml.disabled](./.cirrus.yml.disabled); it would run the integration
+tests for two operating systems (Fedora and CentOS 8) if renamed to
+`.cirrus.yml`. Note that if/once your project grows bigger, or gets frequent
+changes, you may need to move to a paid account, or different infrastructure
+with more capacity.
 
 Tests also run in [Packit](https://packit.dev/) for all currently supported
 Fedora releases; see the [packit.yaml](./packit.yaml) control file. You need to
@@ -298,30 +326,3 @@ see [configuration file](.github/dependabot.yml).
    blog post explains the rationale for this project.
  * [Cockpit Deployment and Developer documentation](https://cockpit-project.org/guide/latest/)
  * [Make your project easily discoverable](https://cockpit-project.org/blog/making-a-cockpit-application.html)
-
-# Running the tests
-
-Unit tests for the Docker client layer. They need neither Docker nor a
-browser:
-
-    make test
-
-Static checks — eslint, stylelint, TypeScript, and Cockpit's own tree checks:
-
-    make codecheck
-
-**Careful:** `make codecheck` skips eslint and stylelint unless `/usr/bin/node`
-exists. `test/common/static-code` gates both on that exact path, so if you run
-Node from nvm or another version manager the two checks are silently skipped
-and the command still exits 0. Either create the symlink once:
-
-    sudo ln -sfn "$(command -v node)" /usr/bin/node
-
-or run the linters directly:
-
-    npm run eslint
-    npm run stylelint
-
-CI runs `make test` on Node 20 and 24 and `make codecheck` on every pull
-request, and fails if either linter is skipped — see
-`.github/workflows/test.yml`.

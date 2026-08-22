@@ -12,8 +12,8 @@
   "scripts": {
     "watch": "ESBUILD_WATCH='true' ./build.js",
     "build": "./build.js",
-    "eslint": "eslint src/",
-    "eslint:fix": "eslint --fix src/",
+    "eslint": "eslint src/ build.js build-tests.js",
+    "eslint:fix": "eslint --fix src/ build.js build-tests.js",
     "stylelint": "stylelint src/*{.css,scss}",
     "stylelint:fix": "stylelint --fix src/*{.css,scss}",
     "test": "./build-tests.js && cd dist-test && node --test"

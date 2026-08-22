@@ -8,10 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     name: unit (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       # A break on 20 must not hide the result on 24, and vice versa.
       fail-fast: false
@@ -34,6 +39,7 @@ jobs:
   lint:
     name: lint and types
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Clone repository
         uses: actions/checkout@v5
@@ -60,8 +66,8 @@ jobs:
           # Without pipefail, tee would mask a failing make.
           set -o pipefail
           make codecheck 2>&1 | tee codecheck.log
-          # Guard: mypy/vulture/ruff may skip (no Python here), eslint and
-          # stylelint may not.
+          # Guard: mypy/vulture/ruff may skip (ruff, mypy and vulture are not
+          # installed on GitHub runners), eslint and stylelint may not.
           if grep -qE 'skipping /static-code/test-(eslint|stylelint)' codecheck.log; then
               echo "::error::static-code skipped eslint or stylelint - they did not run"
               exit 1

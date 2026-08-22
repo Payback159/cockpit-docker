@@ -18,8 +18,9 @@ TABS = (
 )
 
 
-# Nondestructive: this module only reads (docker info, docker compose ls,
-# docker ps), so it can share a VM with other tests.
+# Nondestructive: this test only loads the page and reads its state (docker
+# info, docker compose ls, docker ps); it triggers no action, so it can share
+# a VM with other tests.
 @testlib.nondestructive
 class TestApplication(testlib.MachineCase):
     def testBasic(self):

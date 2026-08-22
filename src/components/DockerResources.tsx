@@ -91,13 +91,15 @@ const ResourceCard = ({ icon, title, count, details }: {
                 gap: '0.5rem',
                 height: '100%',
                 justifyContent: 'space-between'
-            }}>
+            }}
+            >
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.75rem',
                     color: 'var(--pf-v6-global--Color--200)'
-                }}>
+                }}
+                >
                     <div style={{ fontSize: '1.25rem' }}>
                         {icon}
                     </div>
@@ -112,7 +114,8 @@ const ResourceCard = ({ icon, title, count, details }: {
                         fontWeight: 'bold',
                         lineHeight: 1,
                         color: 'var(--pf-v6-global--primary-color--100)'
-                    }}>
+                    }}
+                    >
                         {count}
                     </div>
                     {details && (
@@ -120,7 +123,8 @@ const ResourceCard = ({ icon, title, count, details }: {
                             fontSize: '0.8125rem',
                             color: 'var(--pf-v6-global--Color--200)',
                             marginTop: '0.375rem'
-                        }}>
+                        }}
+                        >
                             {details}
                         </div>
                     )}
@@ -174,7 +178,8 @@ export const DockerResources: React.FC = () => {
                     display: 'flex',
                     gap: '0.75rem',
                     flexWrap: 'wrap'
-                }}>
+                }}
+                >
                     <div style={{ flex: '1 1 0', minWidth: '200px' }}>
                         <ResourceCard
                             icon={<CubeIcon />}

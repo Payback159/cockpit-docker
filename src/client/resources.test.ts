@@ -21,8 +21,12 @@ async function primeAccess() {
 test('listContainers zerlegt die Compose-Labels', async () => {
     await primeAccess();
     setSpawnHandler(() => JSON.stringify({
-        ID: 'abc', Names: 'simple-web-1', Image: 'busybox', State: 'running',
-        Status: 'Up 2 minutes', Ports: '127.0.0.1:8080->80/tcp',
+        ID: 'abc',
+        Names: 'simple-web-1',
+        Image: 'busybox',
+        State: 'running',
+        Status: 'Up 2 minutes',
+        Ports: '127.0.0.1:8080->80/tcp',
         Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
     }));
     const out = await listContainers();
@@ -34,8 +38,13 @@ test('listContainers zerlegt die Compose-Labels', async () => {
 test('listContainers meldet fehlende Labels als unknown', async () => {
     await primeAccess();
     setSpawnHandler(() => JSON.stringify({
-        ID: 'abc', Names: 'standalone', Image: 'busybox', State: 'running',
-        Status: 'Up', Ports: '', Labels: '',
+        ID: 'abc',
+        Names: 'standalone',
+        Image: 'busybox',
+        State: 'running',
+        Status: 'Up',
+        Ports: '',
+        Labels: '',
     }));
     const out = await listContainers();
     assert.equal(out[0].Project, 'unknown');
@@ -53,8 +62,12 @@ test('listContainers filtert auf Compose, wenn verlangt', async () => {
 test('listContainers sortiert nach Projekt, dann Service', async () => {
     await primeAccess();
     const mk = (p: string, s: string) => JSON.stringify({
-        ID: p + s, Names: `${p}-${s}-1`, Image: 'busybox', State: 'running',
-        Status: 'Up', Ports: '',
+        ID: p + s,
+        Names: `${p}-${s}-1`,
+        Image: 'busybox',
+        State: 'running',
+        Status: 'Up',
+        Ports: '',
         Labels: `com.docker.compose.project=${p},com.docker.compose.service=${s}`,
     });
     setSpawnHandler(() => [mk('b', 'z'), mk('a', 'y'), mk('a', 'x')].join('\n'));
@@ -134,12 +147,19 @@ test('listImages markiert von Compose genutzte Images', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
             return JSON.stringify({
-                ID: 'i1', Repository: 'busybox', Tag: 'latest',
-                Size: '4MB', CreatedAt: 'x',
+                ID: 'i1',
+                Repository: 'busybox',
+                Tag: 'latest',
+                Size: '4MB',
+                CreatedAt: 'x',
             });
         return JSON.stringify({
-            ID: 'c1', Names: 'simple-web-1', Image: 'busybox:latest',
-            State: 'running', Status: 'Up', Ports: '',
+            ID: 'c1',
+            Names: 'simple-web-1',
+            Image: 'busybox:latest',
+            State: 'running',
+            Status: 'Up',
+            Ports: '',
             Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
         });
     });
@@ -154,12 +174,19 @@ test('listImages ordnet ein Image ohne expliziten Tag zu', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
             return JSON.stringify({
-                ID: 'i1', Repository: 'busybox', Tag: 'latest',
-                Size: '4MB', CreatedAt: 'x',
+                ID: 'i1',
+                Repository: 'busybox',
+                Tag: 'latest',
+                Size: '4MB',
+                CreatedAt: 'x',
             });
         return JSON.stringify({
-            ID: 'c1', Names: 'simple-web-1', Image: 'busybox',
-            State: 'running', Status: 'Up', Ports: '',
+            ID: 'c1',
+            Names: 'simple-web-1',
+            Image: 'busybox',
+            State: 'running',
+            Status: 'Up',
+            Ports: '',
             Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
         });
     });
@@ -173,12 +200,19 @@ test('listImages laesst ein Image mit Tag <none> unzugeordnet', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
             return JSON.stringify({
-                ID: 'i1', Repository: 'busybox', Tag: '<none>',
-                Size: '4MB', CreatedAt: 'x',
+                ID: 'i1',
+                Repository: 'busybox',
+                Tag: '<none>',
+                Size: '4MB',
+                CreatedAt: 'x',
             });
         return JSON.stringify({
-            ID: 'c1', Names: 'simple-web-1', Image: 'busybox:<none>',
-            State: 'running', Status: 'Up', Ports: '',
+            ID: 'c1',
+            Names: 'simple-web-1',
+            Image: 'busybox:<none>',
+            State: 'running',
+            Status: 'Up',
+            Ports: '',
             Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
         });
     });
@@ -192,13 +226,19 @@ test('listImages ordnet eine Digest-Referenz bewusst NICHT zu (bekannte Grenze)'
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
             return JSON.stringify({
-                ID: 'i1', Repository: 'busybox', Tag: 'latest',
-                Size: '4MB', CreatedAt: 'x',
+                ID: 'i1',
+                Repository: 'busybox',
+                Tag: 'latest',
+                Size: '4MB',
+                CreatedAt: 'x',
             });
         return JSON.stringify({
-            ID: 'c1', Names: 'simple-web-1',
+            ID: 'c1',
+            Names: 'simple-web-1',
             Image: 'busybox@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd',
-            State: 'running', Status: 'Up', Ports: '',
+            State: 'running',
+            Status: 'Up',
+            Ports: '',
             Labels: 'com.docker.compose.project=simple,com.docker.compose.service=web',
         });
     });

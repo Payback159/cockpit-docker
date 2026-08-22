@@ -72,8 +72,13 @@ test('checkCompose meldet fehlendes Compose', async () => {
 
 test('getInfo parst die Kennzahlen', async () => {
     setSpawnHandler(() => JSON.stringify({
-        Containers: 11, ContainersRunning: 10, ContainersStopped: 1,
-        Images: 2, Driver: 'overlayfs', NCPU: 16, MemTotal: 123,
+        Containers: 11,
+        ContainersRunning: 10,
+        ContainersStopped: 1,
+        Images: 2,
+        Driver: 'overlayfs',
+        NCPU: 16,
+        MemTotal: 123,
     }));
     const info = await getInfo();
     assert.equal(info.Containers, 11);

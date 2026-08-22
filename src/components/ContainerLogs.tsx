@@ -39,7 +39,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
     const [follow, setFollow] = useState(false);
     const [loading, setLoading] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
-    const followProcessRef = useRef<{ close: () => void } | null>(null);
+    const followProcessRef = useRef<{ close:() => void } | null>(null);
     const logsContainerRef = useRef<HTMLDivElement>(null);
     const isFollowingRef = useRef<boolean>(false);
 

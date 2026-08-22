@@ -338,7 +338,7 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const wait = delay;
             delay = Math.min(delay * 2, RECONNECT_MAX_DELAY_MS);
             console.warn('DockerProvider: docker-events-Stream abgebrochen, verbinde in',
-                          wait, 'ms neu', err);
+                         wait, 'ms neu', err);
             reconnectTimer = setTimeout(() => {
                 reconnectTimer = null;
                 if (!closed)
@@ -347,6 +347,11 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         connect();
+
+        // Die Menge wird nie ersetzt, nur veraendert -- die Referenz hier
+        // festzuhalten ist daher gleichbedeutend und erfuellt die
+        // Hooks-Regel, die einen ref-Zugriff im Cleanup beanstandet.
+        const pendingTypes = pending.current;
 
         return () => {
             closed = true;
@@ -357,15 +362,21 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 clearTimeout(timer.current);
                 timer.current = null;
             }
-            pending.current.clear();
+            pendingTypes.clear();
         };
     }, [ready, fatalError, mode, onEvent, reportFatal]);
 
     return (
         <DockerContext.Provider
             value={{
-                mode, ready, fatalError, systemInfo, subscribe, reportFatal,
-                activeTab, setActiveTab,
+                mode,
+                ready,
+                fatalError,
+                systemInfo,
+                subscribe,
+                reportFatal,
+                activeTab,
+                setActiveTab,
             }}
         >
             {children}

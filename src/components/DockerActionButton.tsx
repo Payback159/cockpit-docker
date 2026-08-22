@@ -72,9 +72,11 @@ export const DockerActionButton: React.FC<Props> = ({
 
     if (mode !== 'require') {
         return (
-            <Button variant={variant} size={size} icon={icon}
+            <Button
+variant={variant} size={size} icon={icon}
                     isDisabled={isDisabled} onClick={onClick}
-                    {...ariaLabel !== undefined && { 'aria-label': ariaLabel }}>
+                    {...ariaLabel !== undefined && { 'aria-label': ariaLabel }}
+            >
                 {children}
             </Button>
         );
@@ -87,9 +89,11 @@ export const DockerActionButton: React.FC<Props> = ({
 
     return (
         <Privileged allowed={superuser.allowed} tooltipId={tooltipId ?? generatedTooltipId} placement={undefined} excuse={excuse}>
-            <Button variant={variant} size={size} icon={icon}
+            <Button
+variant={variant} size={size} icon={icon}
                     isDisabled={isDisabled || !superuser.allowed} onClick={onClick}
-                    {...ariaLabel !== undefined && { 'aria-label': ariaLabel }}>
+                    {...ariaLabel !== undefined && { 'aria-label': ariaLabel }}
+            >
                 {children}
             </Button>
         </Privileged>

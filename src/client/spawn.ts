@@ -109,8 +109,8 @@ export function probeAccess(
     // Ablehnung muesste sonst zusaetzlich behandelt werden. Der Aufraeumer
     // haengt am Original und laesst die Ablehnung unveraendert weiterlaufen.
     running.then(
-        () => { if (inFlightProbe === running) inFlightProbe = null },
-        () => { if (inFlightProbe === running) inFlightProbe = null });
+        () => { if (inFlightProbe === running) inFlightProbe = null; },
+        () => { if (inFlightProbe === running) inFlightProbe = null; });
     return running;
 }
 

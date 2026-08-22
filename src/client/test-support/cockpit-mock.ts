@@ -55,7 +55,7 @@ function fakeSpawn(args: string[], options: Record<string, unknown> = {}) {
             return promise;
         },
         close() { /* im Test ohne Wirkung */ },
-        input() { return promise; },
+        input() { return promise },
     });
 }
 

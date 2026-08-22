@@ -40,7 +40,7 @@ interface RawContainer {
  * immer mit Tag. Ohne Normalisierung findet die Zuordnung das Image nicht. */
 function normalizeRef(ref: string): string {
     if (ref.includes('@'))
-        return ref;                       // Digest-Referenz, siehe unten
+        return ref; // Digest-Referenz, siehe unten
     const lastSlash = ref.lastIndexOf('/');
     const colon = ref.indexOf(':', lastSlash + 1);
     return colon === -1 ? `${ref}:latest` : ref;

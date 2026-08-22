@@ -67,6 +67,7 @@ test('der exit-Status wird uebernommen', () => {
 test('DockerError ist ein Error und ueber isDockerError erkennbar', () => {
     const e = classifyError(null, 'x', 1);
     assert.ok(e instanceof Error);
+    assert.ok(e instanceof DockerError);
     assert.ok(isDockerError(e));
     assert.ok(!isDockerError(new Error('x')));
     assert.ok(!isDockerError(null));

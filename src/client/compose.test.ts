@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { setSpawnHandler, recordedCalls, resetMock } from './test-support/cockpit-mock';
 import { resetAccessMode, probeAccess } from './spawn';
-import { listProjects, listServices, stopProject, downProject, restartProject, upProject } from './compose';
+import { listProjects, listServices, stopProject, downProject, restartProject, upProject, startProject } from './compose';
 
 beforeEach(() => {
     resetMock();
@@ -71,6 +71,7 @@ test('ein unbekanntes Projekt ist kein Fehler, sondern eine leere Liste', async 
 
 for (const [fn, expected] of [
     [upProject, ['up', '-d']],
+    [startProject, ['start']],
     [stopProject, ['stop']],
     [downProject, ['down']],
     [restartProject, ['restart']],

@@ -71,10 +71,18 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             try {
                 const fileContent = await readComposeFile(configPath);
                 setContent(fileContent);
-                
-                // Highlight the YAML content
-                const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
-                setHighlightedCode(highlighted);
+
+                // Highlighting ist rein kosmetisch und darf ein erfolgreich
+                // gelesenes File nicht als Fehler melden. Ein eigener
+                // try/catch haelt einen hljs-Absturz vom Lesefehlerpfad fern
+                // -- schlaegt es fehl, bleibt highlightedCode leer und die
+                // Anzeige faellt auf den Klartext-Zweig unten zurueck.
+                try {
+                    const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
+                    setHighlightedCode(highlighted);
+                } catch {
+                    setHighlightedCode('');
+                }
             } catch (err) {
                 // readComposeFile() gibt weiter, was cockpit.file().read()
                 // ablehnt -- ein BasicError des Kanals, kein DockerError.

@@ -146,7 +146,7 @@ export const VolumeManagement: React.FC = () => {
     ];
 
     const rows = shown.map((volume) => {
-        const isActionInProgress = actionInProgress === volume.Name;
+        const isActionInProgress = !!actionInProgress;
         const project = getProjectLabel(volume.Labels);
 
         return {
@@ -270,6 +270,7 @@ export const VolumeManagement: React.FC = () => {
                     variant="small"
                     isOpen
                     title={_("Remove this volume?")}
+                    aria-label={_("Remove this volume?")}
                     onClose={() => setConfirmRemove(null)}
                 >
                     <p>{cockpit.format(_("Remove volume $0? This cannot be undone."), confirmRemove)}</p>
@@ -287,9 +288,11 @@ export const VolumeManagement: React.FC = () => {
                     variant="small"
                     isOpen
                     title={_("Remove all unused volumes?")}
+                    aria-label={_("Remove all unused volumes?")}
                     onClose={() => setConfirmPrune(false)}
                 >
                     <p>{_("This removes every volume not used by at least one container. This cannot be undone.")}</p>
+                    <p>{_("This also removes volumes not shown in this list, because they do not belong to a Compose project.")}</p>
                     <div className="pf-v6-u-mt-md">
                         <Button variant="danger" onClick={() => { setConfirmPrune(false); handlePruneVolumes() }}>
                             {_("Prune")}

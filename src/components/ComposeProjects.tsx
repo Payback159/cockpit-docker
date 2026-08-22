@@ -42,7 +42,7 @@ import FileCodeIcon from '@patternfly/react-icons/dist/esm/icons/file-code-icon'
 
 import cockpit from 'cockpit';
 import { ListingTable } from 'cockpit-components-table.jsx';
-import { listProjects, upProject, stopProject, downProject, restartProject, type ComposeProject } from '../client';
+import { listProjects, startProject, stopProject, downProject, restartProject, type ComposeProject } from '../client';
 import { useDockerResource } from '../hooks/useDockerResource';
 import { ActionError } from './ActionError';
 import { DockerActionButton } from './DockerActionButton';
@@ -62,7 +62,7 @@ export const ComposeProjects: React.FC = () => {
     const handleProjectAction = async (name: string, action: 'start' | 'stop' | 'restart' | 'down') => {
         setActionInProgress(`${name}-${action}`);
         try {
-            if (action === 'start') await upProject(name);
+            if (action === 'start') await startProject(name);
             else if (action === 'stop') await stopProject(name);
             else if (action === 'restart') await restartProject(name);
             else await downProject(name);
@@ -114,24 +114,6 @@ export const ComposeProjects: React.FC = () => {
         );
     }
 
-    if (!projects || projects.length === 0) {
-        return (
-            <Card>
-                <CardBody>
-                    <EmptyState>
-                        <CubesIcon />
-                        <h4>{_("No Docker Compose projects found")}</h4>
-                        <EmptyStateBody>
-                            {_("There are no Docker Compose projects running on this system.")}
-                            <br />
-                            {_("Start a project with 'docker compose up -d' to see it here.")}
-                        </EmptyStateBody>
-                    </EmptyState>
-                </CardBody>
-            </Card>
-        );
-    }
-
     const columnTitles = [
         { title: _("Name"), sortable: true, header: true },
         { title: _("Status"), sortable: true },
@@ -139,7 +121,7 @@ export const ComposeProjects: React.FC = () => {
         { title: "", props: { "aria-label": _("Actions") } }
     ];
 
-    const rows = projects.map((project: ComposeProject) => {
+    const rows = (projects ?? []).map((project: ComposeProject) => {
         const isRunning = project.Status.toLowerCase().includes('running');
         const isActionInProgress = !!actionInProgress?.startsWith(`${project.Name}-`);
 
@@ -159,7 +141,7 @@ export const ComposeProjects: React.FC = () => {
                                     isDisabled={isActionInProgress}
                                     onClick={() => setViewFileProject({
                                         name: project.Name,
-                                        path: project.ConfigFiles.split(',')[0],
+                                        path: (project.ConfigFiles ?? '').split(',')[0],
                                     })}
                                 >
                                     {_("View File")}
@@ -211,14 +193,28 @@ export const ComposeProjects: React.FC = () => {
             <CardTitle>{_("Docker Compose Projects")}</CardTitle>
             <CardBody className="contains-list">
                 <ActionError error={actionError} onDismiss={() => setActionError(null)} />
-                <ListingTable
-                    variant="compact"
-                    gridBreakPoint="grid-md"
-                    emptyCaption={_("No Docker Compose projects")}
-                    aria-label={_("Docker Compose Projects")}
-                    columns={columnTitles}
-                    rows={rows}
-                />
+                {!projects || projects.length === 0
+                    ? (
+                        <EmptyState>
+                            <CubesIcon />
+                            <h4>{_("No Docker Compose projects found")}</h4>
+                            <EmptyStateBody>
+                                {_("There are no Docker Compose projects running on this system.")}
+                                <br />
+                                {_("Start a project with 'docker compose up -d' to see it here.")}
+                            </EmptyStateBody>
+                        </EmptyState>
+                    )
+                    : (
+                        <ListingTable
+                            variant="compact"
+                            gridBreakPoint="grid-md"
+                            emptyCaption={_("No Docker Compose projects")}
+                            aria-label={_("Docker Compose Projects")}
+                            columns={columnTitles}
+                            rows={rows}
+                        />
+                    )}
             </CardBody>
 
             {viewFileProject && (
@@ -235,6 +231,7 @@ export const ComposeProjects: React.FC = () => {
                     variant="small"
                     isOpen
                     title={_("Remove all containers of this project?")}
+                    aria-label={_("Remove all containers of this project?")}
                     onClose={() => setConfirmDown(null)}
                 >
                     <p>{cockpit.format(_("This removes every container of project $0. Volumes are kept."), confirmDown)}</p>

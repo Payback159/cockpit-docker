@@ -57,6 +57,23 @@ export async function upProject(project: string): Promise<void> {
     await run(projectArgs(project, 'up', '-d'));
 }
 
+/**
+ * Startet die Container eines bereits vorhandenen Projekts neu, ohne das
+ * Projektmodell aus einer Compose-Datei zu rekonstruieren. `start` arbeitet
+ * -- wie stop/restart/down/ps -- ausschliesslich ueber Container-Labels und
+ * kommt daher ohne -f aus.
+ *
+ * `upProject` (docker compose up -d) waere hier die falsche Wahl: es
+ * benoetigt zwingend die Compose-Datei(en) und schlaegt ohne -f mit
+ * "no configuration file provided: not found" fehl, weil run() ohne
+ * Arbeitsverzeichnis laeuft. upProject bleibt fuer einen
+ * Create-from-file-Ablauf korrekt, den diese Oberflaeche nicht anbietet --
+ * die UI kennt nur bereits bestehende Projekte, fuer die start() genuegt.
+ */
+export async function startProject(project: string): Promise<void> {
+    await run(projectArgs(project, 'start'));
+}
+
 export async function stopProject(project: string): Promise<void> {
     await run(projectArgs(project, 'stop'));
 }

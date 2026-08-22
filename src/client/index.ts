@@ -26,7 +26,7 @@ export { probeAccess, getAccessMode, resetAccessMode, stream } from './spawn';
 export type { AccessMode } from './spawn';
 export { checkDocker, checkCompose, checkSystem, getInfo, countNetworks } from './system';
 export {
-    listProjects, listServices, upProject, stopProject, downProject,
+    listProjects, listServices, upProject, startProject, stopProject, downProject,
     restartProject, readComposeFile,
 } from './compose';
 export {

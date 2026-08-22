@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import cockpit from 'cockpit';
 import {
     Card,
@@ -39,112 +39,31 @@ import RedoIcon from '@patternfly/react-icons/dist/esm/icons/redo-icon';
 import ListIcon from '@patternfly/react-icons/dist/esm/icons/list-icon';
 import { ListingTable } from "cockpit-components-table.jsx";
 import { ContainerLogs } from './ContainerLogs';
+import { listContainers, startContainer, stopContainer, restartContainer, type ContainerSummary } from '../client';
+import { useDockerResource } from '../hooks/useDockerResource';
+import { ActionError } from './ActionError';
+import { DockerActionButton } from './DockerActionButton';
 
 const _ = cockpit.gettext;
 
-interface Container {
-    ID: string;
-    Name: string;
-    Image: string;
-    State: string;
-    Status: string;
-    Project: string;
-    Service: string;
-    Ports: string;
-}
-
 export const ComposeContainers: React.FC = () => {
-    const [containers, setContainers] = useState<Container[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data: containers, loading, error, reload } = useDockerResource(
+        () => listContainers({ composeOnly: true }),
+        { events: ['container'], tab: 1 });
+    const [actionError, setActionError] = useState<Error | null>(null);
     const [logsContainer, setLogsContainer] = useState<string | null>(null);
 
-    const loadContainers = async () => {
+    const handleContainerAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
         try {
-            setLoading(true);
-            setError(null);
-
-            // Get all containers from compose projects
-            const result = await cockpit.spawn(
-                ['docker', 'ps', '-a', '--filter', 'label=com.docker.compose.project', '--format', 'json'],
-                { err: 'message' }
-            );
-
-            if (!result || result.trim() === '') {
-                setContainers([]);
-                return;
-            }
-
-            // Parse NDJSON (newline-delimited JSON)
-            const lines = result.trim().split('\n');
-            const parsed: Container[] = lines.map(line => {
-                const container = JSON.parse(line);
-
-                // Parse labels from comma-separated string
-                const labels: Record<string, string> = {};
-                if (container.Labels) {
-                    const labelPairs = container.Labels.split(',');
-                    labelPairs.forEach((pair: string) => {
-                        const [key, ...valueParts] = pair.split('=');
-                        if (key && valueParts.length > 0) {
-                            labels[key] = valueParts.join('=');
-                        }
-                    });
-                }
-
-                return {
-                    ID: container.ID,
-                    Name: container.Names,
-                    Image: container.Image,
-                    State: container.State,
-                    Status: container.Status,
-                    Project: labels['com.docker.compose.project'] || 'unknown',
-                    Service: labels['com.docker.compose.service'] || 'unknown',
-                    Ports: container.Ports || ''
-                };
-            });
-
-            // Sort by project name, then service name
-            parsed.sort((a, b) => {
-                const projectCompare = a.Project.localeCompare(b.Project);
-                if (projectCompare !== 0) return projectCompare;
-                return a.Service.localeCompare(b.Service);
-            });
-
-            setContainers(parsed);
+            if (action === 'start')
+                await startContainer(name);
+            else if (action === 'stop')
+                await stopContainer(name);
+            else
+                await restartContainer(name);
+            await reload();
         } catch (err) {
-            console.error('Failed to load containers:', err);
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadContainers();
-        const interval = setInterval(loadContainers, 30000); // Refresh every 30 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const handleContainerAction = async (containerName: string, action: 'start' | 'stop' | 'restart') => {
-        try {
-            let command: string;
-            switch (action) {
-            case 'start':
-                command = 'start';
-                break;
-            case 'stop':
-                command = 'stop';
-                break;
-            case 'restart':
-                command = 'restart';
-                break;
-            }
-            await cockpit.spawn(['docker', command, containerName], { err: 'message' });
-            await loadContainers(); // Reload after action
-        } catch (err) {
-            console.error(`Failed to ${action} container:`, err);
-            setError(err instanceof Error ? err.message : String(err));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         }
     };
 
@@ -181,7 +100,7 @@ export const ComposeContainers: React.FC = () => {
                     <EmptyState>
                         <EmptyStateBody>
                             <strong>{_("Error loading containers")}</strong><br />
-                            {error}
+                            {error.message}
                         </EmptyStateBody>
                     </EmptyState>
                 </CardBody>
@@ -189,7 +108,7 @@ export const ComposeContainers: React.FC = () => {
         );
     }
 
-    if (containers.length === 0) {
+    if (!containers || containers.length === 0) {
         return (
             <Card>
                 <CardBody>
@@ -211,7 +130,7 @@ export const ComposeContainers: React.FC = () => {
         }
         acc[container.Project].push(container);
         return acc;
-    }, {} as Record<string, Container[]>);
+    }, {} as Record<string, ContainerSummary[]>);
 
     const columnTitles = [
         { title: _("Service"), sortable: true },
@@ -224,6 +143,7 @@ export const ComposeContainers: React.FC = () => {
 
     return (
         <>
+            <ActionError error={actionError} onDismiss={() => setActionError(null)} />
             {Object.entries(containersByProject).map(([projectName, projectContainers]) => (
                 <Card key={projectName} id={`compose-containers-${projectName}`}>
                     <CardTitle>{_("Project")}: {projectName}</CardTitle>
@@ -244,7 +164,7 @@ export const ComposeContainers: React.FC = () => {
                                             title: (
                                                 <Flex spaceItems={{ default: 'spaceItemsSm' }}>
                                                     <FlexItem>
-                                                        <Button
+                                                        <DockerActionButton
                                                             variant={isRunning ? "secondary" : "primary"}
                                                             size="sm"
                                                             icon={isRunning ? <StopIcon /> : <PlayIcon />}
@@ -254,11 +174,11 @@ export const ComposeContainers: React.FC = () => {
                                                             )}
                                                         >
                                                             {isRunning ? _("Stop") : _("Start")}
-                                                        </Button>
+                                                        </DockerActionButton>
                                                     </FlexItem>
                                                     {isRunning && (
                                                         <FlexItem>
-                                                            <Button
+                                                            <DockerActionButton
                                                                 variant="secondary"
                                                                 size="sm"
                                                                 icon={<RedoIcon />}
@@ -268,7 +188,7 @@ export const ComposeContainers: React.FC = () => {
                                                                 )}
                                                             >
                                                                 {_("Restart")}
-                                                            </Button>
+                                                            </DockerActionButton>
                                                         </FlexItem>
                                                     )}
                                                     <FlexItem>

@@ -7,18 +7,20 @@
   "author": "",
   "license": "LGPL-2.1",
   "engines": {
-    "node": ">= 16"
+    "node": ">=20"
   },
   "scripts": {
     "watch": "ESBUILD_WATCH='true' ./build.js",
     "build": "./build.js",
-    "eslint": "eslint src/",
-    "eslint:fix": "eslint --fix src/",
+    "eslint": "eslint src/ build.js build-tests.js",
+    "eslint:fix": "eslint --fix src/ build.js build-tests.js",
     "stylelint": "stylelint src/*{.css,scss}",
-    "stylelint:fix": "stylelint --fix src/*{.css,scss}"
+    "stylelint:fix": "stylelint --fix src/*{.css,scss}",
+    "test": "./build-tests.js && cd dist-test && node --test"
   },
   "devDependencies": {
     "@patternfly/react-table": "^6.3.1",
+    "@types/node": "24.13.3",
     "@types/react": "18.3.13",
     "@types/react-dom": "18.3.1",
     "@typescript-eslint/eslint-plugin": "8.46.3",
@@ -26,19 +28,18 @@
     "esbuild": "0.25.12",
     "esbuild-sass-plugin": "3.3.1",
     "esbuild-wasm": "0.25.12",
-    "eslint": "9.39.1",
+    "eslint": "8.57.1",
     "eslint-config-standard": "17.1.0",
     "eslint-config-standard-jsx": "11.0.0",
     "eslint-config-standard-react": "13.0.0",
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-node": "11.1.0",
-    "eslint-plugin-promise": "7.2.1",
+    "eslint-plugin-promise": "6.6.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
     "gettext-parser": "8.0.0",
     "glob": "11.0.3",
     "jed": "1.1.1",
-    "qunit": "2.24.2",
     "stylelint": "16.25.0",
     "stylelint-config-recommended-scss": "16.0.2",
     "stylelint-config-standard": "39.0.1",
@@ -51,6 +52,7 @@
     "@patternfly/react-core": "6.4.0",
     "@patternfly/react-icons": "6.4.0",
     "@patternfly/react-styles": "6.4.0",
+    "dequal": "2.0.3",
     "highlight.js": "^11.11.1",
     "react": "18.3.1",
     "react-dom": "18.3.1"

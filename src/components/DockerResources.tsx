@@ -17,13 +17,18 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
     Card,
     CardBody,
     CardTitle
 } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import {
+    EmptyState,
+    EmptyStateBody
+} from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
+import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import {
     CubeIcon,
     ImageIcon,
@@ -32,7 +37,8 @@ import {
 } from '@patternfly/react-icons';
 
 import cockpit from 'cockpit';
-import { getDockerInfo, countVolumes, countNetworks } from '../docker';
+import { getInfo, countNetworks, countVolumes } from '../client';
+import { useDockerResource } from '../hooks/useDockerResource';
 
 const _ = cockpit.gettext;
 
@@ -48,51 +54,113 @@ interface ResourceStats {
     networks: number;
 }
 
-export const DockerResources: React.FC = () => {
-    const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<ResourceStats | null>(null);
+async function loadStats(): Promise<ResourceStats> {
+    // Counts only: the overview shows numbers, not details. A listVolumes()
+    // here would be an extra `volume inspect` over ALL volumes whose payload
+    // would be discarded right away.
+    const [info, networks, volumes] = await Promise.all([
+        getInfo(),
+        countNetworks(),
+        countVolumes(),
+    ]);
 
-    const loadStats = async () => {
-        try {
-            const [dockerInfo, volumeCount, networkCount] = await Promise.all([
-                getDockerInfo(),
-                countVolumes(),
-                countNetworks()
-            ]);
-
-            if (dockerInfo) {
-                setStats({
-                    containers: {
-                        total: dockerInfo.Containers,
-                        running: dockerInfo.ContainersRunning,
-                        stopped: dockerInfo.ContainersStopped,
-                        paused: dockerInfo.ContainersPaused
-                    },
-                    images: dockerInfo.Images,
-                    volumes: volumeCount,
-                    networks: networkCount
-                });
-            }
-        } catch (error) {
-            console.error('Failed to load resource stats:', error);
-        } finally {
-            setLoading(false);
-        }
+    return {
+        containers: {
+            total: info.Containers,
+            running: info.ContainersRunning,
+            stopped: info.ContainersStopped,
+            paused: info.ContainersPaused,
+        },
+        images: info.Images,
+        volumes,
+        networks,
     };
+}
 
-    useEffect(() => {
-        loadStats();
-        
-        // Auto-refresh every 30 seconds
-        const interval = setInterval(loadStats, 30000);
-        return () => clearInterval(interval);
-    }, []);
+const ResourceCard = ({ icon, title, count, details }: {
+    icon: React.ReactNode;
+    title: string;
+    count: number;
+    details?: string;
+}) => (
+    <Card isCompact style={{ height: '100%' }}>
+        <CardBody style={{ padding: '1rem' }}>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                height: '100%',
+                justifyContent: 'space-between'
+            }}
+            >
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    color: 'var(--pf-v6-global--Color--200)'
+                }}
+                >
+                    <div style={{ fontSize: '1.25rem' }}>
+                        {icon}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        {title}
+                    </div>
+                </div>
+
+                <div>
+                    <div style={{
+                        fontSize: '2rem',
+                        fontWeight: 'bold',
+                        lineHeight: 1,
+                        color: 'var(--pf-v6-global--primary-color--100)'
+                    }}
+                    >
+                        {count}
+                    </div>
+                    {details && (
+                        <div style={{
+                            fontSize: '0.8125rem',
+                            color: 'var(--pf-v6-global--Color--200)',
+                            marginTop: '0.375rem'
+                        }}
+                        >
+                            {details}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </CardBody>
+    </Card>
+);
+
+export const DockerResources: React.FC = () => {
+    const { data: stats, loading, error } = useDockerResource(
+        () => loadStats(),
+        { events: ['container', 'image', 'volume', 'network'], tab: 0 });
 
     if (loading) {
         return (
             <Card>
                 <CardBody>
-                    <Spinner size="lg" />
+                    <Bullseye>
+                        <Spinner size="lg" />
+                    </Bullseye>
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card>
+                <CardBody>
+                    <EmptyState>
+                        <EmptyStateBody>
+                            <strong>{_("Error loading resource overview")}</strong><br />
+                            {error.message}
+                        </EmptyStateBody>
+                    </EmptyState>
                 </CardBody>
             </Card>
         );
@@ -102,74 +170,24 @@ export const DockerResources: React.FC = () => {
         return null;
     }
 
-    const ResourceCard = ({ icon, title, count, details }: {
-        icon: React.ReactNode;
-        title: string;
-        count: number;
-        details?: string;
-    }) => (
-        <Card isCompact style={{ height: '100%' }}>
-            <CardBody style={{ padding: '1rem' }}>
-                <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    gap: '0.5rem',
-                    height: '100%',
-                    justifyContent: 'space-between'
-                }}>
-                    <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '0.75rem',
-                        color: 'var(--pf-v6-global--Color--200)'
-                    }}>
-                        <div style={{ fontSize: '1.25rem' }}>
-                            {icon}
-                        </div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                            {title}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <div style={{ 
-                            fontSize: '2rem', 
-                            fontWeight: 'bold',
-                            lineHeight: 1,
-                            color: 'var(--pf-v6-global--primary-color--100)'
-                        }}>
-                            {count}
-                        </div>
-                        {details && (
-                            <div style={{ 
-                                fontSize: '0.8125rem', 
-                                color: 'var(--pf-v6-global--Color--200)',
-                                marginTop: '0.375rem'
-                            }}>
-                                {details}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </CardBody>
-        </Card>
-    );
-
     return (
         <Card>
             <CardTitle>{_("Resources Overview")}</CardTitle>
             <CardBody>
-                <div style={{ 
-                    display: 'flex', 
+                <div style={{
+                    display: 'flex',
                     gap: '0.75rem',
                     flexWrap: 'wrap'
-                }}>
+                }}
+                >
                     <div style={{ flex: '1 1 0', minWidth: '200px' }}>
                         <ResourceCard
                             icon={<CubeIcon />}
                             title={_("Containers")}
                             count={stats.containers.total}
-                            details={`${stats.containers.running} ${_("running")}, ${stats.containers.stopped} ${_("stopped")}`}
+                            details={cockpit.format(
+                                _("$0 running, $1 stopped"),
+                                stats.containers.running, stats.containers.stopped)}
                         />
                     </div>
                     <div style={{ flex: '1 1 0', minWidth: '200px' }}>

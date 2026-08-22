@@ -1,0 +1,71 @@
+# Test and development environment for cockpit-docker.
+#
+# systemd runs as PID 1 so that cockpit.socket and docker.service start the way
+# they do on a real server. The container needs --privileged because it runs
+# its OWN Docker daemon (Docker-in-Docker) instead of mounting the host's
+# socket -- otherwise actions like "Prune" or "Down" would delete real data on
+# the host.
+ARG BASE=ubuntu:26.04
+FROM ${BASE}
+
+# distro     = docker.io + docker-compose-v2 from the distribution
+# docker.com = docker-ce + docker-compose-plugin from the official repo
+ARG DOCKER_SOURCE=distro
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV container=docker
+
+# On the package block below -- both look redundant on Ubuntu but are needed on
+# Debian; please do not "clean this up":
+#   docker-cli: docker.io only *recommends* it, and --no-install-recommends
+#   throws recommendations away, so Debian needs it explicitly. On Ubuntu
+#   docker-cli is a virtual package provided by docker.io -- naming it is a no-op.
+#   Compose cascade: Ubuntu 26.04 only knows docker-compose-v2, Debian 13 only
+#   docker-compose; docker-compose-plugin covers further distributions.
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        systemd systemd-sysv dbus \
+        cockpit-ws cockpit-bridge cockpit-system \
+        sudo iproute2 ca-certificates curl gnupg openssh-server \
+    && if [ "$DOCKER_SOURCE" = "distro" ]; then \
+           apt-get install -y -qq --no-install-recommends docker.io docker-cli \
+           && (apt-get install -y -qq --no-install-recommends docker-compose-v2 \
+               || apt-get install -y -qq --no-install-recommends docker-compose-plugin \
+               || apt-get install -y -qq --no-install-recommends docker-compose); \
+       else \
+           . /etc/os-release \
+           && install -m 0755 -d /etc/apt/keyrings \
+           && curl -fsSL "https://download.docker.com/linux/$ID/gpg" \
+                -o /etc/apt/keyrings/docker.asc \
+           && chmod a+r /etc/apt/keyrings/docker.asc \
+           && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$ID $VERSION_CODENAME stable" \
+                > /etc/apt/sources.list.d/docker.list \
+           && apt-get update -qq \
+           && apt-get install -y -qq --no-install-recommends \
+                docker-ce docker-ce-cli containerd.io docker-compose-plugin; \
+       fi \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Two users for the two access situations of the client layer:
+#   devel: in group docker  -> reaches Docker WITHOUT escalation
+#   admin: only in sudo     -> needs superuser, triggers "permission denied"
+RUN useradd -m -s /bin/bash -G sudo,docker devel \
+    && echo 'devel:devel' | chpasswd \
+    && useradd -m -s /bin/bash -G sudo admin \
+    && echo 'admin:admin' | chpasswd
+
+# No TLS: access happens exclusively over 127.0.0.1.
+RUN mkdir -p /etc/cockpit \
+    && printf '[WebService]\nAllowUnencrypted=true\n' > /etc/cockpit/cockpit.conf
+
+# Services that cannot run in the container and would otherwise cause "degraded".
+RUN systemctl mask systemd-udevd systemd-udev-trigger systemd-modules-load \
+        systemd-networkd-wait-online e2scrub_reap getty@tty1 \
+        getty.target console-getty 2>/dev/null || true
+
+RUN systemctl enable cockpit.socket docker.service ssh
+
+STOPSIGNAL SIGRTMIN+3
+EXPOSE 9090
+CMD ["/sbin/init"]

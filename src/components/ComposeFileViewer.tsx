@@ -32,7 +32,7 @@ import yaml from 'highlight.js/lib/languages/yaml';
 import 'highlight.js/styles/github-dark.css';
 
 import cockpit from 'cockpit';
-import { readComposeFile } from '../docker';
+import { readComposeFile } from '../client';
 
 // Register YAML language
 hljs.registerLanguage('yaml', yaml);
@@ -71,12 +71,29 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             try {
                 const fileContent = await readComposeFile(configPath);
                 setContent(fileContent);
-                
-                // Highlight the YAML content
-                const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
-                setHighlightedCode(highlighted);
+
+                // Highlighting is purely cosmetic and must not report a
+                // successfully read file as an error. A try/catch of its own
+                // keeps an hljs crash away from the read-error path -- if it
+                // fails, highlightedCode stays empty and the display falls
+                // back to the plain-text branch below.
+                try {
+                    const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
+                    setHighlightedCode(highlighted);
+                } catch {
+                    setHighlightedCode('');
+                }
             } catch (err) {
-                setError(err instanceof Error ? err.message : String(err));
+                // readComposeFile() passes on whatever cockpit.file().read()
+                // rejects with -- a BasicError of the channel, not a
+                // DockerError. It is not an Error instance, but does carry a
+                // .message field.
+                const message = err instanceof Error
+                    ? err.message
+                    : (err !== null && typeof err === 'object' && 'message' in err
+                        ? String((err as { message: unknown }).message)
+                        : String(err));
+                setError(message);
             } finally {
                 setLoading(false);
             }
@@ -105,12 +122,12 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
 
     return (
         <Modal
-            title={_(`Compose File: ${projectName}`)}
+            title={cockpit.format(_("Compose file: $0"), projectName)}
             isOpen={isOpen}
             onClose={handleClose}
             width="85%"
         >
-            {/* Header mit Dateipfad */}
+            {/* Header with the file path */}
             <div
                 style={{
                     display: 'flex',
@@ -160,17 +177,16 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                     <CodeBlock>
                         <CodeBlockCode style={{ fontSize: '13px', lineHeight: '1.6' }}>
                             <pre style={{ margin: 0 }}>
-                                <code
-                                    className="hljs language-yaml"
-                                    dangerouslySetInnerHTML={{ __html: highlightedCode || content }}
-                                />
+                                {highlightedCode
+                                    ? <code className="hljs language-yaml" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+                                    : <code className="hljs language-yaml">{content}</code>}
                             </pre>
                         </CodeBlockCode>
                     </CodeBlock>
                 </div>
             )}
 
-            {/* Footer mit Buttons */}
+            {/* Footer with buttons */}
             <div
                 style={{
                     display: 'flex',

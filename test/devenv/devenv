@@ -1,0 +1,161 @@
+#!/bin/sh
+# Lifecycle of the test and development environment.
+#
+#   up     start the container (builds the image if needed), load fixtures
+#   down   remove the container AND both storage volumes
+#   shell  open a shell in the container
+#   reset  reset the fixtures without rebuilding
+set -eu
+
+NAME=cockpit-docker-devenv
+IMAGE=cockpit-docker-devenv
+VOL_DOCKER=${NAME}-docker
+VOL_CONTAINERD=${NAME}-containerd
+PORT=${DEVENV_PORT:-19090}
+SSH_PORT=${DEVENV_SSH_PORT:-12222}
+WITH_SSH=0
+BASE=ubuntu:26.04
+DOCKER_SOURCE=distro
+
+REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+HERE=$REPO_ROOT/test/devenv
+
+usage() {
+    echo "Usage: devenv {up|down|shell|reset|test} [--base IMAGE] [--source distro|docker.com] [--ssh]" >&2
+    exit 2
+}
+
+cmd=${1:-}
+[ -n "$cmd" ] || usage
+shift || true
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --base)   BASE=${2:?--base needs an argument}; shift 2 ;;
+        --source) DOCKER_SOURCE=${2:?--source needs an argument}; shift 2 ;;
+        --ssh)  WITH_SSH=1; shift ;;
+        --)     shift; break ;;
+        *)      break ;;
+    esac
+done
+
+build() {
+    docker build -q --build-arg "BASE=$BASE" --build-arg "DOCKER_SOURCE=$DOCKER_SOURCE" \
+        -t "$IMAGE" -f "$HERE/Containerfile" "$HERE" >/dev/null
+}
+
+running() {
+    docker ps --filter "name=^${NAME}$" --format '{{.Names}}' | grep -qx "$NAME"
+}
+
+wait_ready() {
+    i=0
+    while [ "$i" -lt 40 ]; do
+        if docker exec "$NAME" systemctl is-active docker.service 2>/dev/null | grep -q '^active$'; then
+            return 0
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+    echo "docker.service in the container did not become active" >&2
+    docker logs "$NAME" >&2 2>&1 || true
+    return 1
+}
+
+case $cmd in
+up)
+    if running; then
+        # --base/--source must not be silently ignored: otherwise you measure
+        # Ubuntu while you asked for Debian.
+        cur_base=$(docker inspect -f '{{index .Config.Labels "devenv.base"}}' "$NAME" 2>/dev/null || true)
+        cur_source=$(docker inspect -f '{{index .Config.Labels "devenv.source"}}' "$NAME" 2>/dev/null || true)
+        if [ -n "$cur_base" ] && \
+           { [ "$cur_base" != "$BASE" ] || [ "$cur_source" != "$DOCKER_SOURCE" ]; }; then
+            echo "Already running with --base $cur_base --source $cur_source," >&2
+            echo "but --base $BASE --source $DOCKER_SOURCE was requested." >&2
+            echo "Run 'devenv down' first, then start again." >&2
+            exit 1
+        fi
+        echo "Already running: http://127.0.0.1:$PORT"
+        exit 0
+    fi
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    build
+    # IMPORTANT: no --tmpfs or cgroup mounts (systemd otherwise dies with 255).
+    # Two named volumes, otherwise overlay-on-overlay when starting containers.
+    ssh_opt=""
+    [ "$WITH_SSH" -eq 1 ] && ssh_opt="-p 127.0.0.1:$SSH_PORT:22"
+    # shellcheck disable=SC2086
+    docker run -d --name "$NAME" --privileged \
+        --label "devenv.base=$BASE" --label "devenv.source=$DOCKER_SOURCE" \
+        -p "127.0.0.1:$PORT:9090" $ssh_opt \
+        -v "$VOL_DOCKER:/var/lib/docker" \
+        -v "$VOL_CONTAINERD:/var/lib/containerd" \
+        -v "$REPO_ROOT/dist:/usr/local/share/cockpit/cockpit-docker:ro" \
+        -v "$REPO_ROOT/test/fixtures:/srv/fixtures:ro" \
+        "$IMAGE" >/dev/null
+    wait_ready
+    if [ -x "$REPO_ROOT/test/fixtures/load.sh" ]; then
+        docker exec "$NAME" /srv/fixtures/load.sh >/dev/null 2>&1 || \
+            echo "Note: fixtures could not be loaded" >&2
+    fi
+    echo "Ready: http://127.0.0.1:$PORT   (devel/devel or admin/admin)"
+    ;;
+down)
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    docker volume rm "$VOL_DOCKER" "$VOL_CONTAINERD" >/dev/null 2>&1 || true
+    echo "Removed: container and both volumes"
+    ;;
+shell)
+    running || { echo "Not running - run 'devenv up' first" >&2; exit 1; }
+    if [ $# -gt 0 ]; then
+        docker exec "$NAME" sh "$@"
+    else
+        docker exec -it "$NAME" bash
+    fi
+    ;;
+reset)
+    running || { echo "Not running - run 'devenv up' first" >&2; exit 1; }
+    docker exec "$NAME" /srv/fixtures/load.sh --reset
+    echo "Fixtures reset"
+    ;;
+test)
+    # Cockpit's run-tests builds the machine without an identity_file, so
+    # machine.py falls back to DEFAULT_IDENTITY_FILE = bots/machine/identity and
+    # logs in as root. That exact public key therefore has to be in
+    # authorized_keys -- a self-generated key never reaches the runner and ends
+    # in "Permission denied (publickey)".
+    ID_PUB=$REPO_ROOT/bots/machine/identity.pub
+    RUN_TESTS=$REPO_ROOT/test/common/run-tests
+    # bots/ and test/common/ are gitignored and fetched on demand.
+    [ -f "$ID_PUB" ] || {
+        echo "Missing: $ID_PUB" >&2
+        echo "Cockpit's bots are not checked out - run 'make bots' first." >&2
+        exit 1
+    }
+    [ -x "$RUN_TESTS" ] || {
+        echo "Missing: $RUN_TESTS" >&2
+        echo "Cockpit's test/common is not checked out - run 'make test/common' first." >&2
+        exit 1
+    }
+    "$0" up --ssh --base "$BASE" --source "$DOCKER_SOURCE"
+    docker port "$NAME" 22 >/dev/null 2>&1 || {
+        echo "Container is running without SSH - run 'devenv down', then 'devenv test'" >&2
+        exit 1
+    }
+    # Overwrite rather than append: repeated runs must not bloat the file.
+    docker exec -i "$NAME" sh -c \
+        'mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys' \
+        < "$ID_PUB"
+    sshp=$(docker port "$NAME" 22 | head -1 | cut -d: -f2)
+    echo "run-tests against 127.0.0.1:$sshp (ssh, key bots/machine/identity)"
+    echo "and 127.0.0.1:$PORT (web)"
+    "$RUN_TESTS" \
+        --machine "127.0.0.1:$sshp" \
+        --browser "127.0.0.1:$PORT" \
+        "$@"
+    ;;
+*)
+    usage
+    ;;
+esac

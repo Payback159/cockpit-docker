@@ -1,0 +1,7 @@
+# Base file. Together with compose.override.yaml it produces a ConfigFiles
+# with TWO comma-separated paths -- the case where a "-f <path,path>" call
+# fails.
+services:
+  app:
+    image: busybox
+    command: sleep infinity

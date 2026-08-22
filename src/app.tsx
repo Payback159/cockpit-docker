@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Page,
     PageSection
@@ -35,35 +35,47 @@ import { ComposeContainers } from './components/ComposeContainers';
 import { ComposeImages } from './components/ComposeImages';
 import { PortMapping } from './components/PortMapping';
 import { VolumeManagement } from './components/VolumeManagement';
+import { DockerProvider, useDockerContext } from './DockerProvider';
+import { FatalErrorBanner } from './components/FatalErrorBanner';
 
 const _ = cockpit.gettext;
 
 export const Application = () => {
-    const [activeTabKey, setActiveTabKey] = useState<string | number>(0);
+    return (
+        <DockerProvider>
+            <ApplicationTabs />
+        </DockerProvider>
+    );
+};
+
+const ApplicationTabs = () => {
+    const { activeTab, setActiveTab, fatalError, ready } = useDockerContext();
 
     return (
         <Page className="no-masthead-sidebar">
             <PageSection hasBodyWrapper={false}>
+                {fatalError && <FatalErrorBanner error={fatalError} />}
                 <Tabs
-                    activeKey={activeTabKey}
-                    onSelect={(_event, tabIndex) => setActiveTabKey(tabIndex)}
+                    activeKey={activeTab}
+                    onSelect={(_event, tabIndex) => setActiveTab(tabIndex)}
+                    mountOnEnter
                 >
-                    <Tab eventKey={0} title={<TabTitleText>{_("Overview")}</TabTitleText>}>
+                    <Tab eventKey={0} title={<TabTitleText>{_("Overview")}</TabTitleText>} isDisabled={!!fatalError}>
                         <DockerStatus />
                     </Tab>
-                    <Tab eventKey={1} title={<TabTitleText>{_("Containers")}</TabTitleText>}>
+                    <Tab eventKey={1} title={<TabTitleText>{_("Containers")}</TabTitleText>} isDisabled={!!fatalError || !ready}>
                         <ComposeContainers />
                     </Tab>
-                    <Tab eventKey={2} title={<TabTitleText>{_("Compose Projects")}</TabTitleText>}>
+                    <Tab eventKey={2} title={<TabTitleText>{_("Compose Projects")}</TabTitleText>} isDisabled={!!fatalError || !ready}>
                         <ComposeProjects />
                     </Tab>
-                    <Tab eventKey={3} title={<TabTitleText>{_("Images")}</TabTitleText>}>
+                    <Tab eventKey={3} title={<TabTitleText>{_("Images")}</TabTitleText>} isDisabled={!!fatalError || !ready}>
                         <ComposeImages />
                     </Tab>
-                    <Tab eventKey={4} title={<TabTitleText>{_("Volumes")}</TabTitleText>}>
+                    <Tab eventKey={4} title={<TabTitleText>{_("Volumes")}</TabTitleText>} isDisabled={!!fatalError || !ready}>
                         <VolumeManagement />
                     </Tab>
-                    <Tab eventKey={5} title={<TabTitleText>{_("Port Mappings")}</TabTitleText>}>
+                    <Tab eventKey={5} title={<TabTitleText>{_("Port Mappings")}</TabTitleText>} isDisabled={!!fatalError || !ready}>
                         <PortMapping />
                     </Tab>
                 </Tabs>

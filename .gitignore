@@ -21,6 +21,7 @@
 /cockpit-navigator.spec
 /deploy.sh
 /dist/
+/dist-test/
 /Makefile.deploy
 /package-lock.json
 /pkg/
@@ -29,6 +30,7 @@
 /tools/
  
 # subdirs (/subdir/...)
+/docs/superpowers/
 /packaging/arch/PKGBUILD
 /packaging/debian/changelog
 /po/*.pot

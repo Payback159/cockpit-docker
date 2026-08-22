@@ -1,0 +1,6 @@
+# Started by load.sh and stopped again right away, so that the branch
+# "status exited / start button instead of stop" is covered.
+services:
+  worker:
+    image: busybox
+    command: sleep infinity

@@ -24,6 +24,7 @@ import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { CodeBlock, CodeBlockCode } from "@patternfly/react-core/dist/esm/components/CodeBlock/index.js";
 import DownloadIcon from '@patternfly/react-icons/dist/esm/icons/download-icon';
+import { containerLogs, followLogs, type DockerError } from '../client';
 
 const _ = cockpit.gettext;
 
@@ -38,7 +39,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
     const [follow, setFollow] = useState(false);
     const [loading, setLoading] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
-    const followProcessRef = useRef<cockpit.Spawn<string> | null>(null);
+    const followProcessRef = useRef<{ close:() => void } | null>(null);
     const logsContainerRef = useRef<HTMLDivElement>(null);
     const isFollowingRef = useRef<boolean>(false);
 
@@ -65,32 +66,32 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 stopFollowing();
 
                 // Start following logs
-                const args = ['docker', 'logs', '-f', '--tail', '100', containerName];
-                const process = cockpit.spawn(args, { err: 'out' });
-
-                followProcessRef.current = process;
-                isFollowingRef.current = true;
-
-                process.stream((data: string) => {
-                    setLogs(prev => prev + stripAnsiCodes(data));
-                    // Auto-scroll in next tick
-                    setTimeout(() => {
-                        if (logsContainerRef.current) {
-                            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
-                        }
-                    }, 0);
-                });
-
-                process.catch((error: Error) => {
-                    if (error.message !== 'cancelled') {
-                        console.error('Failed to follow logs:', error);
+                const handle = followLogs(
+                    containerName,
+                    chunk => {
+                        setLogs(prev => prev + stripAnsiCodes(chunk));
+                        // Auto-scroll in next tick
+                        setTimeout(() => {
+                            if (logsContainerRef.current) {
+                                logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+                            }
+                        }, 0);
+                    },
+                    (streamErr: DockerError) => {
+                        // The stream has already ended when this callback
+                        // fires -- without this message a torn-off
+                        // `docker logs -f` (container removed, say) would
+                        // vanish in the background without the display
+                        // showing it.
+                        console.error('Failed to follow logs:', streamErr);
+                        setLogs(prev => prev + '\n' + _("Error following logs: ") + streamErr.message);
+                        isFollowingRef.current = false;
+                        setFollow(false);
                     }
-                    isFollowingRef.current = false;
-                });
+                );
 
-                process.finally(() => {
-                    isFollowingRef.current = false;
-                });
+                followProcessRef.current = handle;
+                isFollowingRef.current = true;
 
                 setLoading(false);
             } else {
@@ -98,11 +99,8 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 stopFollowing();
 
                 // Load last 1000 lines
-                const result = await cockpit.spawn(
-                    ['docker', 'logs', '--tail', '1000', containerName],
-                    { err: 'out' }
-                );
-                setLogs(stripAnsiCodes(result));
+                const text = await containerLogs(containerName, 1000);
+                setLogs(stripAnsiCodes(text));
                 setLoading(false);
             }
         } catch (err) {
@@ -182,7 +180,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                     gap: '1.5rem',
                     alignItems: 'center',
                     padding: '0.5rem 0',
-                    borderBottom: '1px solid var(--pf-v6-global--BorderColor--100)',
+                    borderBottom: '1px solid var(--pf-t--global--border--color--default)',
                     marginBottom: '0.75rem'
                 }}
             >
@@ -196,7 +194,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                     <span
                         style={{
                             fontSize: '0.875rem',
-                            color: 'var(--pf-v6-global--success-color--100)',
+                            color: 'var(--pf-t--global--icon--color--status--success--default)',
                             fontWeight: 600
                         }}
                     >
@@ -211,7 +209,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 style={{
                     height: 'calc(85vh - 160px)',
                     overflow: 'auto',
-                    background: 'var(--pf-v6-global--BackgroundColor--dark--100)',
+                    background: 'var(--pf-t--global--background--color--secondary--default)',
                     borderRadius: '8px',
                     padding: '1rem',
                     marginBottom: '1rem'
@@ -225,14 +223,14 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 </CodeBlock>
             </div>
 
-            {/* Footer mit Buttons */}
+            {/* Footer with buttons */}
             <div
                 style={{
                     display: 'flex',
                     justifyContent: 'flex-end',
                     gap: '0.5rem',
                     padding: '1rem',
-                    borderTop: '1px solid var(--pf-v6-global--BorderColor--100)'
+                    borderTop: '1px solid var(--pf-t--global--border--color--default)'
                 }}
             >
                 <Button

@@ -1,0 +1,8 @@
+# Second file: adds a port and one more service.
+services:
+  app:
+    ports:
+      - "127.0.0.1:8081:80"
+  sidecar:
+    image: busybox
+    command: sleep infinity

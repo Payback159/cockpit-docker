@@ -1,0 +1,19 @@
+# Five services: forces multi-line NDJSON from
+# "docker compose ps --format json". A JSON.parse over the whole output fails
+# from the second service onwards.
+services:
+  one:
+    image: busybox
+    command: sleep infinity
+  two:
+    image: busybox
+    command: sleep infinity
+  three:
+    image: busybox
+    command: sleep infinity
+  four:
+    image: busybox
+    command: sleep infinity
+  five:
+    image: busybox
+    command: sleep infinity

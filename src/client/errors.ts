@@ -51,9 +51,11 @@ export function isDockerError(e: unknown): e is DockerError {
     return e instanceof DockerError;
 }
 
-/* Gemessene stderr-Muster. Reihenfolge ist bedeutsam: 'permission denied'
- * und 'failed to connect' nennen beide die Docker-API, deshalb wird zuerst
- * auf die Berechtigung geprueft. */
+/* Gemessene stderr-Muster. Ueber alle gemessenen Meldungen sind sie disjunkt
+ * -- keine Meldung trifft auf zwei Muster zu, die Reihenfolge ist daher ohne
+ * Wirkung. Das erste passende Muster gewinnt; kaeme spaeter ein Muster hinzu,
+ * das eine bereits abgedeckte Meldung ebenfalls trifft, muesste die
+ * Reihenfolge erneut bedacht werden. */
 const PATTERNS: ReadonlyArray<[RegExp, DockerErrorKind]> = [
     [/permission denied while trying to connect/i, 'permission-denied'],
     [/failed to connect to the docker api/i, 'daemon-unreachable'],

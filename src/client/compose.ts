@@ -25,7 +25,7 @@
  */
 import cockpit from 'cockpit';
 
-import { run } from './spawn';
+import { getAccessMode, run } from './spawn';
 import { parseJsonList } from './parse';
 import type { ComposeProject, ComposeService } from './types';
 
@@ -42,11 +42,10 @@ export async function listProjects(): Promise<ComposeProject[]> {
  * Services eines Projekts. Ein unbekanntes Projekt liefert eine leere Liste,
  * keinen Fehler -- Docker beendet sich in diesem Fall mit exit 0.
  *
- * Hinweis fuer die Ueberpruefung: Diese Funktion hat derzeit keinen Aufrufer
- * in der Oberflaeche. Sie steht hier, weil die Spec sie fuer compose.ts
- * vorsieht und weil ihr Test das NDJSON-Verhalten absichert, an dem die
- * frueherer Implementierung ab dem zweiten Service scheiterte. Kommt bis zur
- * Abnahme kein Aufrufer hinzu, ist sie ein Kandidat zum Entfernen.
+ * Die Funktion gehoert zur Schnittstelle, die die Spec fuer compose.ts
+ * vorsieht, auch wenn die Oberflaeche sie derzeit nicht aufruft; ihr Test
+ * sichert das NDJSON-Verhalten ab, an dem die frueherer Implementierung ab
+ * dem zweiten Service scheiterte.
  */
 export async function listServices(project: string): Promise<ComposeService[]> {
     const out = await run(projectArgs(project, 'ps', '--format', 'json', '--all'));
@@ -66,9 +65,9 @@ export async function upProject(project: string): Promise<void> {
  * `upProject` (docker compose up -d) waere hier die falsche Wahl: es
  * benoetigt zwingend die Compose-Datei(en) und schlaegt ohne -f mit
  * "no configuration file provided: not found" fehl, weil run() ohne
- * Arbeitsverzeichnis laeuft. upProject bleibt fuer einen
- * Create-from-file-Ablauf korrekt, den diese Oberflaeche nicht anbietet --
- * die UI kennt nur bereits bestehende Projekte, fuer die start() genuegt.
+ * Arbeitsverzeichnis laeuft. upProject bleibt Teil der Schnittstelle fuer
+ * einen Create-from-file-Ablauf; diese Oberflaeche kennt nur bereits
+ * bestehende Projekte, fuer die start() genuegt.
  */
 export async function startProject(project: string): Promise<void> {
     await run(projectArgs(project, 'start'));
@@ -89,8 +88,16 @@ export async function restartProject(project: string): Promise<void> {
 /**
  * Liest eine Compose-Datei. Erwartet EINEN Pfad -- Aufrufer, die ein
  * ConfigFiles-Feld haben, muessen es vorher an Kommas zerlegen.
+ *
+ * Der Zugriffsmodus gilt auch hier: laeuft der Docker-Zugriff ueber
+ * Rechteerhoehung, liegen die Projektverzeichnisse in aller Regel unter root.
+ * Ohne `superuser` scheiterte allein diese Leseoperation, waehrend jede
+ * andere Operation des Moduls funktioniert.
  */
 export async function readComposeFile(path: string): Promise<string> {
-    const content = await cockpit.file(path).read();
+    const options = getAccessMode() === 'require'
+        ? { superuser: 'require' as const }
+        : {};
+    const content = await cockpit.file(path, options).read();
     return content ?? '';
 }

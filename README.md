@@ -190,7 +190,23 @@ The container runs with `--privileged`. This is required because it runs its
 actions such as "Prune unused" or "Down" would operate on your real containers
 and volumes. The port is bound to `127.0.0.1` only.
 
-# Running tests locally
+# Running the unit tests
+
+    make test
+
+This builds the `src/**/*.test.ts` files with esbuild into `dist-test/` and
+runs them with the built-in `node --test`. The tests cover the client layer in
+`src/client/` — output parsing, error classification, the access-mode probe and
+the command construction of the Docker calls. They need **neither a running
+Docker daemon nor a browser**, so they run on any checkout in a few seconds.
+Imports of `cockpit` are redirected to a test double
+(`src/client/test-support/cockpit-mock.ts`) by an esbuild alias.
+
+Node 20 or newer is required (`engines.node` in `package.json`); the criterion
+is `node --test`, which is stable from Node 20 on. Development happens on
+Node 24, see `.nvmrc`.
+
+# Running the integration tests locally
 
 Run `make check` to build an RPM, install it into a standard Cockpit test VM
 (centos-9-stream by default), and run the test/check-application integration test on

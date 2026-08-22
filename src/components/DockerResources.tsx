@@ -37,7 +37,7 @@ import {
 } from '@patternfly/react-icons';
 
 import cockpit from 'cockpit';
-import { getInfo, countNetworks, listVolumes } from '../client';
+import { getInfo, countNetworks, countVolumes } from '../client';
 import { useDockerResource } from '../hooks/useDockerResource';
 
 const _ = cockpit.gettext;
@@ -55,10 +55,13 @@ interface ResourceStats {
 }
 
 async function loadStats(): Promise<ResourceStats> {
+    // Nur Zaehlungen: die Uebersicht zeigt Zahlen, keine Details. Ein
+    // listVolumes() waere hier ein zusaetzliches `volume inspect` ueber ALLE
+    // Volumes, dessen Nutzlast sofort verworfen wuerde.
     const [info, networks, volumes] = await Promise.all([
         getInfo(),
         countNetworks(),
-        listVolumes(),
+        countVolumes(),
     ]);
 
     return {
@@ -69,7 +72,7 @@ async function loadStats(): Promise<ResourceStats> {
             paused: info.ContainersPaused,
         },
         images: info.Images,
-        volumes: volumes.length,
+        volumes,
         networks,
     };
 }

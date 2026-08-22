@@ -91,7 +91,11 @@ export async function listImages(): Promise<DockerImage[]> {
 }
 
 export async function pullImage(ref: string): Promise<void> {
-    await run(['docker', 'pull', ref]);
+    // `--` beendet die Optionsliste: die Referenz kommt aus einem freien
+    // Eingabefeld, und ein fuehrender Bindestrich soll nicht als Flag gelesen
+    // werden. Eine Shell ist ohnehin nicht beteiligt (cockpit.spawn nimmt ein
+    // argv), es geht allein um die Argumentzuordnung.
+    await run(['docker', 'pull', '--', ref]);
 }
 
 export async function removeImage(id: string): Promise<void> {

@@ -49,6 +49,20 @@ export async function listVolumes(): Promise<DockerVolume[]> {
     }));
 }
 
+/**
+ * Zaehlt Volumes, ohne sie zu inspizieren.
+ *
+ * Die Uebersicht braucht nur die Anzahl. `listVolumes()` dafuer zu verwenden
+ * hiesse, jedes Volume zu inspizieren und die vollstaendige Nutzlast wieder
+ * wegzuwerfen -- und das bei jedem entprellten Ereignis. Gegenstueck zu
+ * countNetworks() in system.ts.
+ */
+export async function countVolumes(): Promise<number> {
+    const out = await run(['docker', 'volume', 'ls', '-q']);
+    const trimmed = out.trim();
+    return trimmed === '' ? 0 : trimmed.split('\n').length;
+}
+
 export async function removeVolume(name: string, force = false): Promise<void> {
     const args = ['docker', 'volume', 'rm'];
     if (force)

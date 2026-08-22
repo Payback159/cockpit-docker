@@ -40,8 +40,12 @@ interface Options {
     intervalMs?: number;
 }
 
+/* Ursachen, die jeden Tab betreffen (Spec Abschnitt 3): sie gehoeren als
+ * Banner ueber alle Tabs, nicht als lokale Fehlermeldung in jede Ansicht. */
+const FATAL_KINDS = ['not-installed', 'daemon-unreachable', 'permission-denied'];
+
 export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {}) {
-    const { subscribe, activeTab, ready, fatalError } = useDockerContext();
+    const { subscribe, activeTab, ready, fatalError, reportFatal } = useDockerContext();
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -81,7 +85,18 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
         } catch (err) {
             if (gen !== generation.current)
                 return;
-            setError(isDockerError(err) ? err : (err as Error));
+            // Modulweite Ursachen an den Kontext geben: dort wird ein
+            // einzelnes Banner gezeigt und die Tabs werden deaktiviert.
+            // Frueher landete auch ein toter Daemon als roher Text in jeder
+            // einzelnen Ansicht, sobald er erst nach dem Start eintrat.
+            // not-found und command-failed betreffen nur diesen Ladevorgang
+            // und bleiben lokal.
+            if (isDockerError(err) && FATAL_KINDS.includes(err.kind)) {
+                reportFatal(err);
+                setError(null);
+            } else {
+                setError(isDockerError(err) ? err : (err as Error));
+            }
         } finally {
             if (gen === generation.current) {
                 loadedOnce.current = true;
@@ -89,7 +104,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
                 setRefreshing(false);
             }
         }
-    }, []);
+    }, [reportFatal]);
 
     // Erstes Laden, sobald der Tab sichtbar und der Zugriff geklaert ist.
     useEffect(() => {

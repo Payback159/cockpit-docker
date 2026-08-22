@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { setSpawnHandler, recordedCalls, resetMock } from './test-support/cockpit-mock';
 import { probeAccess, resetAccessMode } from './spawn';
 import { listContainers } from './containers';
-import { listVolumes, pruneVolumes, removeVolume } from './volumes';
+import { countVolumes, listVolumes, pruneVolumes, removeVolume } from './volumes';
 import { listImages } from './images';
 
 beforeEach(() => {
@@ -87,6 +87,24 @@ test('listVolumes liefert bei keinem Volume eine leere Liste ohne inspect', asyn
     await primeAccess();
     setSpawnHandler(() => '');
     assert.deepEqual(await listVolumes(), []);
+    assert.equal(recordedCalls().length, 1);
+});
+
+// Die Uebersicht braucht nur die Anzahl. Ueber listVolumes() gezaehlt waere
+// das ls + ein inspect ueber ALLE Volumes, dessen Nutzlast sofort wieder
+// verworfen wird -- und das bei jedem entprellten Ereignis.
+test('countVolumes zaehlt mit genau EINEM Aufruf und ohne inspect', async () => {
+    await primeAccess();
+    setSpawnHandler(() => 'v1\nv2\nv3\n');
+    assert.equal(await countVolumes(), 3);
+    assert.equal(recordedCalls().length, 1);
+    assert.deepEqual(recordedCalls()[0].args, ['docker', 'volume', 'ls', '-q']);
+});
+
+test('countVolumes liefert bei leerer Ausgabe 0', async () => {
+    await primeAccess();
+    setSpawnHandler(() => '\n  \n');
+    assert.equal(await countVolumes(), 0);
     assert.equal(recordedCalls().length, 1);
 });
 

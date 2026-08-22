@@ -29,6 +29,8 @@ import {
     EmptyStateBody
 } from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
+import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
@@ -52,6 +54,7 @@ export const ComposeImages: React.FC = () => {
     const [pullImageInput, setPullImageInput] = useState('');
     const [isPulling, setIsPulling] = useState(false);
     const [isCleaning, setIsCleaning] = useState(false);
+    const [confirmCleanup, setConfirmCleanup] = useState(false);
 
     const shown = React.useMemo(
         () => (images ?? []).filter(img => img.UsedByCompose),
@@ -146,90 +149,121 @@ export const ComposeImages: React.FC = () => {
     const unusedCount = (images ?? []).filter(img => !img.UsedByCompose).length;
 
     return (
-        <Card id="compose-images">
-            <CardTitle>
-                <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-                    <FlexItem>
-                        <InputGroup>
-                            <InputGroupItem isFill>
-                                <TextInput
-                                    type="text"
-                                    placeholder={_("Pull new image (e.g., nginx:latest)")}
-                                    value={pullImageInput}
-                                    onChange={(_event, value) => setPullImageInput(value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handlePullNewImage();
-                                        }
-                                    }}
-                                    isDisabled={isPulling || isCleaning}
-                                />
-                            </InputGroupItem>
-                            <InputGroupItem>
-                                <DockerActionButton
-                                    variant="primary"
-                                    icon={<DownloadIcon />}
-                                    onClick={handlePullNewImage}
-                                    isDisabled={isPulling || isCleaning || !pullImageInput.trim()}
-                                >
-                                    {isPulling ? _("Pulling...") : _("Pull Image")}
-                                </DockerActionButton>
-                            </InputGroupItem>
-                        </InputGroup>
-                    </FlexItem>
-                    {unusedCount > 0 && (
+        <>
+            <Card id="compose-images">
+                <CardTitle>
+                    <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
                         <FlexItem>
-                            <DockerActionButton
-                                variant="danger"
-                                icon={<TrashIcon />}
-                                onClick={handleCleanupUnusedImages}
-                                isDisabled={isPulling || isCleaning}
-                            >
-                                {isCleaning
-                                    ? _("Cleaning up...")
-                                    : cockpit.format(cockpit.ngettext("Cleanup $0 unused image", "Cleanup $0 unused images", unusedCount), unusedCount)}
-                            </DockerActionButton>
+                            <InputGroup>
+                                <InputGroupItem isFill>
+                                    <TextInput
+                                        type="text"
+                                        placeholder={_("Pull new image (e.g., nginx:latest)")}
+                                        value={pullImageInput}
+                                        onChange={(_event, value) => setPullImageInput(value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handlePullNewImage();
+                                            }
+                                        }}
+                                        isDisabled={isPulling || isCleaning}
+                                    />
+                                </InputGroupItem>
+                                <InputGroupItem>
+                                    <DockerActionButton
+                                        variant="primary"
+                                        icon={<DownloadIcon />}
+                                        onClick={handlePullNewImage}
+                                        isDisabled={isPulling || isCleaning || !pullImageInput.trim()}
+                                    >
+                                        {isPulling ? _("Pulling...") : _("Pull Image")}
+                                    </DockerActionButton>
+                                </InputGroupItem>
+                            </InputGroup>
                         </FlexItem>
-                    )}
-                </Flex>
-            </CardTitle>
-            <CardBody>
-                <ActionError error={actionError} onDismiss={() => setActionError(null)} />
-                {shown.length === 0
-                    ? (
-                        <EmptyState>
-                            <EmptyStateBody>
-                                <strong>{_("No compose images found")}</strong><br />
-                                {_("No images used by Docker Compose projects are currently available.")}
-                            </EmptyStateBody>
-                        </EmptyState>
-                    )
-                    : (
-                        <ListingTable
-                            aria-label="Docker images"
-                            columns={columnTitles}
-                            rows={shown.map((image) => ({
-                                columns: [
-                                    { title: image.Repository },
-                                    { title: image.Tag },
-                                    { title: image.ID.substring(0, 12) },
-                                    { title: image.Size },
-                                    {
-                                        title: (
-                                            <Flex spaceItems={{ default: 'spaceItemsXs' }}>
-                                                {image.ComposeProjects.map(project => (
-                                                    <FlexItem key={project}>
-                                                        <Label color="blue">{project}</Label>
-                                                    </FlexItem>
-                                                ))}
-                                            </Flex>
-                                        )
-                                    }
-                                ]
-                            }))}
-                        />
-                    )}
-            </CardBody>
-        </Card>
+                        {unusedCount > 0 && (
+                            <FlexItem>
+                                <DockerActionButton
+                                    variant="danger"
+                                    icon={<TrashIcon />}
+                                    onClick={() => setConfirmCleanup(true)}
+                                    isDisabled={isPulling || isCleaning}
+                                >
+                                    {isCleaning
+                                        ? _("Cleaning up...")
+                                        : cockpit.format(cockpit.ngettext("Cleanup $0 unused image", "Cleanup $0 unused images", unusedCount), unusedCount)}
+                                </DockerActionButton>
+                            </FlexItem>
+                        )}
+                    </Flex>
+                </CardTitle>
+                <CardBody>
+                    <ActionError error={actionError} onDismiss={() => setActionError(null)} />
+                    {shown.length === 0
+                        ? (
+                            <EmptyState>
+                                <EmptyStateBody>
+                                    <strong>{_("No compose images found")}</strong><br />
+                                    {_("No images used by Docker Compose projects are currently available.")}
+                                </EmptyStateBody>
+                            </EmptyState>
+                        )
+                        : (
+                            <ListingTable
+                                aria-label="Docker images"
+                                columns={columnTitles}
+                                rows={shown.map((image) => ({
+                                    columns: [
+                                        { title: image.Repository },
+                                        { title: image.Tag },
+                                        { title: image.ID.substring(0, 12) },
+                                        { title: image.Size },
+                                        {
+                                            title: (
+                                                <Flex spaceItems={{ default: 'spaceItemsXs' }}>
+                                                    {image.ComposeProjects.map(project => (
+                                                        <FlexItem key={project}>
+                                                            <Label color="blue">{project}</Label>
+                                                        </FlexItem>
+                                                    ))}
+                                                </Flex>
+                                            )
+                                        }
+                                    ]
+                                }))}
+                            />
+                        )}
+                </CardBody>
+            </Card>
+
+            {confirmCleanup && (
+                <Modal
+                    variant="small"
+                    isOpen
+                    title={_("Remove unused images?")}
+                    aria-label={_("Remove unused images?")}
+                    onClose={() => setConfirmCleanup(false)}
+                >
+                    <p>
+                        {cockpit.format(
+                            cockpit.ngettext(
+                                "This removes $0 image that no Compose project uses. This cannot be undone.",
+                                "This removes $0 images that no Compose project use. This cannot be undone.",
+                                unusedCount),
+                            unusedCount)}
+                    </p>
+                    <p>{_("These images are not shown in this list, because the list only shows images used by Compose projects.")}</p>
+                    <div className="pf-v6-u-mt-md">
+                        <Button
+                            variant="danger"
+                            onClick={() => { setConfirmCleanup(false); handleCleanupUnusedImages() }}
+                        >
+                            {_("Remove")}
+                        </Button>{' '}
+                        <Button variant="link" onClick={() => setConfirmCleanup(false)}>{_("Cancel")}</Button>
+                    </div>
+                </Modal>
+            )}
+        </>
     );
 };

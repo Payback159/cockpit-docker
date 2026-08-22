@@ -22,7 +22,9 @@
 export * from './types';
 export { DockerError, isDockerError } from './errors';
 export type { DockerErrorKind } from './errors';
-export { probeAccess, getAccessMode, resetAccessMode, stream } from './spawn';
+export {
+    probeAccess, getAccessMode, resetAccessMode, setSuperuserAllowedSource, stream,
+} from './spawn';
 export type { AccessMode } from './spawn';
 export { checkDocker, checkCompose, checkSystem, getInfo, countNetworks } from './system';
 export {
@@ -34,4 +36,4 @@ export {
     containerLogs, followLogs,
 } from './containers';
 export { listImages, pullImage, removeImage } from './images';
-export { listVolumes, removeVolume, pruneVolumes } from './volumes';
+export { listVolumes, countVolumes, removeVolume, pruneVolumes } from './volumes';

@@ -4,11 +4,14 @@ import assert from 'node:assert/strict';
 import {
     setSpawnHandler, recordedCalls, resetMock, FakeProcessError,
 } from './test-support/cockpit-mock';
-import { probeAccess, getAccessMode, resetAccessMode, run } from './spawn';
+import {
+    probeAccess, getAccessMode, resetAccessMode, run, setSuperuserAllowedSource,
+} from './spawn';
 
 beforeEach(() => {
     resetMock();
     resetAccessMode();
+    setSuperuserAllowedSource(() => false);
 });
 
 // Lage 1: Nutzer ist in der Gruppe docker. Der Zugriff gelingt ohne
@@ -99,4 +102,62 @@ test('run ohne vorherige Probe fuehrt sie selbst aus', async () => {
     setSpawnHandler(() => 'ok');
     await run(['docker', 'ps']);
     assert.equal(getAccessMode(), 'none');
+});
+
+// Ohne eigenes superuserAllowed muss die Probe die hinterlegte Quelle
+// befragen -- und zwar erst im Moment der Eskalation. Beim Seitenaufbau ist
+// superuser.allowed zunaechst null und wird erst danach true; ein beim Aufruf
+// abgelesener Wert liesse die Eskalation nie zustande kommen.
+test('ohne Argument fragt die Probe die hinterlegte Quelle -- erst bei der Eskalation', async () => {
+    let allowed = false;
+    setSuperuserAllowedSource(() => allowed);
+    setSpawnHandler(call => {
+        if (call.superuser === 'require')
+            return '{}';
+        // Zwischen Aufruf und Eskalation wird der Admin-Zugriff bekannt.
+        allowed = true;
+        throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
+    });
+    assert.equal(await probeAccess(), 'require');
+    assert.equal(recordedCalls().length, 2);
+});
+
+test('meldet die Quelle keinen Admin-Zugriff, wird nicht eskaliert', async () => {
+    setSuperuserAllowedSource(() => false);
+    setSpawnHandler(() => {
+        throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
+    });
+    await assert.rejects(() => probeAccess());
+    assert.equal(recordedCalls().length, 1);
+});
+
+// run() darf waehrend einer laufenden Probe (etwa nach resetAccessMode())
+// keine zweite starten: beide wuerden den Modus setzen, und die spaetere
+// koennte den bereits eskalierten Modus wieder auf 'none' zuruecknehmen.
+test('gleichzeitige Proben teilen sich einen Lauf', async () => {
+    setSuperuserAllowedSource(() => true);
+    setSpawnHandler(call => {
+        if (call.superuser === 'require')
+            return '{}';
+        throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
+    });
+    const [a, b, c] = await Promise.all([probeAccess(), probeAccess(), run(['docker', 'ps'])]);
+    assert.equal(a, 'require');
+    assert.equal(b, 'require');
+    assert.equal(c, '{}');
+    // genau eine Probe (2 Aufrufe) plus das eigentliche `docker ps`
+    assert.equal(recordedCalls().length, 3);
+    assert.equal(getAccessMode(), 'require');
+});
+
+// Nach Abschluss darf die naechste Probe wieder wirklich laufen (sonst
+// bliebe ein einmal ermitteltes Ergebnis fuer immer stehen).
+test('nach Abschluss ist die Probe wieder ausfuehrbar', async () => {
+    setSpawnHandler(() => '{}');
+    await probeAccess();
+    resetAccessMode();
+    resetMock();
+    setSpawnHandler(() => '{}');
+    await probeAccess();
+    assert.equal(recordedCalls().length, 1);
 });

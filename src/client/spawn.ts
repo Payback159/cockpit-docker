@@ -36,6 +36,27 @@ export type AccessMode = 'none' | 'require';
 
 let accessMode: AccessMode | null = null;
 
+/* Quelle fuer "Admin-Zugriff ist verfuegbar".
+ *
+ * Bewusst ein Setter statt eines Imports von 'superuser': dieses Modul soll
+ * ohne die cockpit-Seitenumgebung testbar bleiben (die Unit-Tests aliasen nur
+ * 'cockpit'), und der Provider ist ohnehin die Stelle, die den Wert
+ * beobachtet. Wichtig ist, dass hier eine FUNKTION hinterlegt wird und kein
+ * Wert: `superuser.allowed` ist waehrend der Sitzungsinitialisierung `null`
+ * und wird erst spaeter `true`/`false` (siehe pkg/lib/superuser.js). Ein
+ * einmal kopierter Wert waere daher fast immer `null` -- gelesen wird deshalb
+ * erst im Moment der Eskalation. */
+let superuserAllowedSource: () => boolean = () => false;
+
+export function setSuperuserAllowedSource(fn: () => boolean): void {
+    superuserAllowedSource = fn;
+}
+
+/* Laufende Probe, damit gleichzeitige Aufrufer (Provider-Start, run()s
+ * Selbstprobe nach resetAccessMode()) nicht mehrere `docker info` starten und
+ * sich gegenseitig den Modus ueberschreiben. */
+let inFlightProbe: Promise<AccessMode> | null = null;
+
 export function getAccessMode(): AccessMode | null {
     return accessMode;
 }
@@ -76,9 +97,24 @@ function invoke(args: string[], mode: AccessMode, environ?: string[]): Promise<s
  * verfuegbar, ein zweiter Versuch mit superuser. Schlagen beide fehl, wird
  * der klassifizierte Fehler geworfen.
  */
-export async function probeAccess(
+export function probeAccess(
     opts: { superuserAllowed?: boolean } = {}
 ): Promise<AccessMode> {
+    if (inFlightProbe !== null)
+        return inFlightProbe;
+
+    const running = doProbe(opts);
+    inFlightProbe = running;
+    // Nicht .finally() an das zurueckgegebene Promise haengen: dessen
+    // Ablehnung muesste sonst zusaetzlich behandelt werden. Der Aufraeumer
+    // haengt am Original und laesst die Ablehnung unveraendert weiterlaufen.
+    running.then(
+        () => { if (inFlightProbe === running) inFlightProbe = null },
+        () => { if (inFlightProbe === running) inFlightProbe = null });
+    return running;
+}
+
+async function doProbe(opts: { superuserAllowed?: boolean }): Promise<AccessMode> {
     const probe = ['docker', 'info', '--format', '{{json .}}'];
 
     try {
@@ -92,7 +128,10 @@ export async function probeAccess(
         // nicht besser.
         if (first.kind === 'not-installed' || first.kind === 'daemon-unreachable')
             throw first;
-        if (!opts.superuserAllowed)
+        // Erst JETZT lesen: zum Zeitpunkt des Aufrufs kann die
+        // cockpit-Sitzung den Admin-Zugriff noch gar nicht kennen.
+        const allowed = opts.superuserAllowed ?? superuserAllowedSource();
+        if (!allowed)
             throw first;
 
         try {

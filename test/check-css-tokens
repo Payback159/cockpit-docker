@@ -91,9 +91,41 @@ if [ -s "$tmp/missing" ]; then
     failed=1
 fi
 
+# --- 3. modals still built on the PatternFly 5 API ---------------------------
+#
+# PatternFly 6 removed `title` from Modal and expects ModalHeader / ModalBody /
+# ModalFooter as children. `ModalProps extends React.HTMLProps<HTMLDivElement>`,
+# so a stray `title` still type-checks -- it just becomes the HTML title
+# attribute, a mouse-over tooltip, and no heading is rendered. Without
+# ModalBody there is no scrolling region either, so long content is clipped by
+# the modal box and the footer is pushed out of sight. Seven dialogs in this
+# module were built that way, and nothing caught it.
+#
+# Matched per file: a file that opens a <Modal must also use ModalBody, and
+# `title=` must never appear within a few lines of the opening tag.
+: > "$tmp/modal_problems"
+for f in $(grep -rl '<Modal' "$SRC" 2>/dev/null); do
+    grep -q 'ModalBody' "$f" ||
+        echo "  $(basename "$f"): uses <Modal> without ModalBody" >> "$tmp/modal_problems"
+    grep -A6 '<Modal$' "$f" | grep -q '^\s*title=' &&
+        echo "  $(basename "$f"): passes title= to <Modal> (belongs on ModalHeader)" >> "$tmp/modal_problems"
+done
+
+if [ -s "$tmp/modal_problems" ]; then
+    echo "Modals built on the PatternFly 5 API:" >&2
+    cat "$tmp/modal_problems" >&2
+    echo "" >&2
+    echo "PatternFly 6 wants <ModalHeader title=... />, <ModalBody> and" >&2
+    echo "<ModalFooter>. A title on <Modal> becomes an HTML tooltip attribute" >&2
+    echo "and renders no heading." >&2
+    failed=1
+fi
+
 if [ "$failed" -eq 0 ]; then
     n_refs=$(wc -l < "$tmp/refs")
     n_used=$(wc -l < "$tmp/used")
+    n_modals=$(grep -rl '<Modal' "$SRC" 2>/dev/null | wc -l)
     echo "css: $n_refs custom propert$([ "$n_refs" -eq 1 ] && echo y || echo ies) and $n_used utility class$([ "$n_used" -eq 1 ] && echo "" || echo es) referenced by src/, all resolved"
+    echo "modals: $n_modals file$([ "$n_modals" -eq 1 ] && echo "" || echo s) use the PatternFly 6 composition"
 fi
 exit "$failed"

@@ -19,7 +19,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import cockpit from 'cockpit';
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { CodeBlock, CodeBlockCode } from "@patternfly/react-core/dist/esm/components/CodeBlock/index.js";
@@ -169,40 +174,42 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
     return (
         <Modal
             width="85%"
-            title={_("Container Logs: ") + containerName}
             isOpen={isOpen}
             onClose={handleClose}
         >
-            {/* Toolbar */}
-            <div className="ct-panel-header ct-panel-header--toolbar">
-                <Checkbox
+            <ModalHeader title={cockpit.format(_("Container logs: $0"), containerName)} />
+            <ModalBody>
+                {/* Toolbar */}
+                <div className="ct-panel-header ct-panel-header--toolbar">
+                    <Checkbox
                     id="follow-logs"
                     label={follow ? _("Following logs...") : _("Follow logs")}
                     isChecked={follow}
                     onChange={(_event, checked) => setFollow(checked)}
-                />
-                {follow && (
-                    <span className="ct-live-indicator">
-                        🟢 Live
-                    </span>
-                )}
-            </div>
+                    />
+                    {follow && (
+                        <span className="ct-live-indicator">
+                            🟢 Live
+                        </span>
+                    )}
+                </div>
 
-            {/* Logs Content */}
-            <div
+                {/* Logs Content */}
+                <div
                 ref={logsContainerRef}
-                className="ct-scroll-pane ct-scroll-pane--file"
-            >
-                <CodeBlock>
-                    <CodeBlockCode className="ct-code-logs">
-                        {loading && !logs ? _("Loading logs...") : logs || _("No logs available")}
-                        <div ref={logsEndRef} />
-                    </CodeBlockCode>
-                </CodeBlock>
-            </div>
+                className="ct-scroll-pane"
+                >
+                    <CodeBlock>
+                        <CodeBlockCode className="ct-code-logs">
+                            {loading && !logs ? _("Loading logs...") : logs || _("No logs available")}
+                            <div ref={logsEndRef} />
+                        </CodeBlockCode>
+                    </CodeBlock>
+                </div>
 
-            {/* Footer with buttons */}
-            <div className="ct-panel-footer ct-panel-footer--spaced">
+            </ModalBody>
+
+            <ModalFooter>
                 <Button
                     variant="secondary"
                     icon={<DownloadIcon />}
@@ -215,7 +222,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 <Button variant="primary" onClick={handleClose} size="sm">
                     {_("Close")}
                 </Button>
-            </div>
+            </ModalFooter>
         </Modal>
     );
 };

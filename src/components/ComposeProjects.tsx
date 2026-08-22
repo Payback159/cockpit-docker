@@ -31,7 +31,12 @@ import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/inde
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Modal } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import {
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter
+} from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { CubesIcon } from '@patternfly/react-icons';
 import PlayIcon from '@patternfly/react-icons/dist/esm/icons/play-icon';
@@ -230,17 +235,18 @@ export const ComposeProjects: React.FC = () => {
                 <Modal
                     variant="small"
                     isOpen
-                    title={_("Remove all containers of this project?")}
-                    aria-label={_("Remove all containers of this project?")}
                     onClose={() => setConfirmDown(null)}
                 >
-                    <p>{cockpit.format(_("This removes every container of project $0. Volumes are kept."), confirmDown)}</p>
-                    <div className="ct-block-spaced">
+                    <ModalHeader title={_("Remove all containers of this project?")} />
+                    <ModalBody>
+                        <p>{cockpit.format(_("This removes every container of project $0. Volumes are kept."), confirmDown)}</p>
+                    </ModalBody>
+                    <ModalFooter>
                         <Button variant="danger" onClick={() => { const n = confirmDown; setConfirmDown(null); handleProjectAction(n, 'down') }}>
                             {_("Remove")}
-                        </Button>{' '}
+                        </Button>
                         <Button variant="link" onClick={() => setConfirmDown(null)}>{_("Cancel")}</Button>
-                    </div>
+                    </ModalFooter>
                 </Modal>
             )}
         </Card>

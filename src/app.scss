@@ -152,28 +152,6 @@
     color: var(--pf-t--global--text--color--subtle);
 }
 
-// A framed block of detail rows inside a modal
-.ct-detail-panel {
-    background-color: var(--pf-t--global--background--color--primary--default);
-    border: 1px solid var(--pf-t--global--border--color--default);
-    border-radius: var(--pf-t--global--border--radius--medium);
-    margin-bottom: var(--pf-t--global--spacer--md);
-    padding: var(--pf-t--global--spacer--md);
-}
-
-// Right-aligned actions below a panel, separated by a rule
-.ct-panel-footer {
-    border-top: 1px solid var(--pf-t--global--border--color--default);
-    display: flex;
-    justify-content: flex-end;
-    padding: var(--pf-t--global--spacer--md);
-
-    // When the footer carries more than one button
-    &--spaced {
-        gap: var(--pf-t--global--spacer--sm);
-    }
-}
-
 // Labels that wrap onto further lines instead of stretching their container
 .ct-label-row {
     display: flex;
@@ -215,18 +193,20 @@
     font-weight: 600;
 }
 
-// Log and file viewers: a scrolling, code-like surface
+// Log and file viewers: a scrolling, code-like surface.
+//
+// The pane scrolls itself rather than letting the whole ModalBody scroll.
+// Otherwise anything above it -- the log viewer's "Follow logs" toggle --
+// scrolls out of reach as soon as the content is long. Viewport-relative so
+// it adapts to the window; if the modal ends up shorter than this, ModalBody
+// takes over the scrolling.
 .ct-scroll-pane {
     background-color: var(--pf-t--global--background--color--secondary--default);
     border-radius: var(--pf-t--global--border--radius--medium);
     margin-bottom: var(--pf-t--global--spacer--md);
+    max-height: 60vh;
     overflow: auto;
     padding: var(--pf-t--global--spacer--md);
-
-    // Inside a modal, fill what the dialog leaves after header and footer
-    &--file {
-        height: calc(85vh - 160px);
-    }
 }
 
 .ct-code-file,

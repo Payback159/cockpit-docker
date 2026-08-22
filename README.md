@@ -1,5 +1,23 @@
 # Cockpit Docker
 
+> ## Archived — use [cockpit-compose](https://github.com/RXTX4816/cockpit-compose) instead
+>
+> This module is no longer developed. Everything it does for Compose projects,
+> `cockpit-compose` does as well or better, and it goes considerably further:
+> Podman in addition to Docker (rootless and rootful), bulk actions across
+> stacks, background tasks, an interactive shell into a service, a YAML editor
+> with diff and snapshots, an `.env` editor, backup and restore, scaling, live
+> logs with per-service filtering, translations into 22 languages, and ready-made
+> packages for Arch, Fedora/RHEL and Debian/Ubuntu.
+>
+> The one thing this module had that `cockpit-compose` does not is host-wide
+> resource management outside of Compose — the Images, Volumes and Port Mappings
+> tabs. If you need those, [cockpit-podman](https://github.com/cockpit-project/cockpit-podman)
+> covers the equivalent ground for Podman.
+>
+> The repository stays up as a read-only reference. It is not maintained, and it
+> will not receive security or dependency updates.
+
 A [Cockpit](https://cockpit-project.org/) module for managing Docker and Docker Compose.
 
 This project provides a modern web interface for managing Docker containers and Docker Compose projects through Cockpit.

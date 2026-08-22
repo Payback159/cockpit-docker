@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import cockpit from 'cockpit';
 import {
     Card,
@@ -31,131 +31,31 @@ import {
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
-import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { InputGroup, InputGroupItem } from "@patternfly/react-core/dist/esm/components/InputGroup/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import DownloadIcon from '@patternfly/react-icons/dist/esm/icons/download-icon';
 import TrashIcon from '@patternfly/react-icons/dist/esm/icons/trash-icon';
 import { ListingTable } from "cockpit-components-table.jsx";
+import { listImages, pullImage, removeImage } from '../client';
+import { useDockerResource } from '../hooks/useDockerResource';
+import { ActionError } from './ActionError';
+import { DockerActionButton } from './DockerActionButton';
 
 const _ = cockpit.gettext;
 
-interface DockerImage {
-    ID: string;
-    Repository: string;
-    Tag: string;
-    Size: string;
-    CreatedAt: string;
-    UsedByCompose: boolean;
-    ComposeProjects: string[];
-}
-
-interface ComposeService {
-    Project: string;
-    Service: string;
-    Image: string;
-}
-
 export const ComposeImages: React.FC = () => {
-    const [images, setImages] = useState<DockerImage[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { data: images, loading, error, reload } = useDockerResource(
+        () => listImages(),
+        { events: ['image', 'container'], tab: 3 });
+    const [actionError, setActionError] = useState<Error | null>(null);
     const [pullImageInput, setPullImageInput] = useState('');
     const [isPulling, setIsPulling] = useState(false);
     const [isCleaning, setIsCleaning] = useState(false);
 
-    const loadImages = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Get all images
-            const imagesResult = await cockpit.spawn(
-                ['docker', 'images', '--format', 'json'],
-                { err: 'message' }
-            );
-
-            // Get compose containers to determine which images are used by compose
-            const containersResult = await cockpit.spawn(
-                ['docker', 'ps', '-a', '--filter', 'label=com.docker.compose.project', '--format', 'json'],
-                { err: 'message' }
-            );
-
-            const imageLines = imagesResult.trim().split('\n')
-                    .filter(line => line);
-            const parsedImages: DockerImage[] = imageLines.map(line => {
-                const img = JSON.parse(line);
-                return {
-                    ID: img.ID,
-                    Repository: img.Repository,
-                    Tag: img.Tag,
-                    Size: img.Size,
-                    CreatedAt: img.CreatedAt,
-                    UsedByCompose: false,
-                    ComposeProjects: []
-                };
-            });
-
-            // Parse compose containers
-            if (containersResult && containersResult.trim()) {
-                const containerLines = containersResult.trim().split('\n');
-                const composeServices: ComposeService[] = containerLines.map(line => {
-                    const container = JSON.parse(line);
-                    // Parse labels from comma-separated string
-                    const labels: Record<string, string> = {};
-                    if (container.Labels) {
-                        const labelPairs = container.Labels.split(',');
-                        labelPairs.forEach((pair: string) => {
-                            const [key, ...valueParts] = pair.split('=');
-                            if (key && valueParts.length > 0) {
-                                labels[key] = valueParts.join('=');
-                            }
-                        });
-                    }
-
-                    return {
-                        Project: labels['com.docker.compose.project'] || 'unknown',
-                        Service: labels['com.docker.compose.service'] || 'unknown',
-                        Image: container.Image
-                    };
-                });
-
-                // Mark images used by compose
-                parsedImages.forEach(image => {
-                    const imageFullName = `${image.Repository}:${image.Tag}`;
-                    const usingServices = composeServices.filter(
-                        svc => svc.Image === imageFullName || svc.Image === image.Repository
-                    );
-
-                    if (usingServices.length > 0) {
-                        image.UsedByCompose = true;
-                        image.ComposeProjects = [...new Set(usingServices.map(svc => svc.Project))];
-                    }
-                });
-            }
-
-            // Sort: compose images first, then by repository
-            parsedImages.sort((a, b) => {
-                if (a.UsedByCompose && !b.UsedByCompose) return -1;
-                if (!a.UsedByCompose && b.UsedByCompose) return 1;
-                return a.Repository.localeCompare(b.Repository);
-            });
-
-            setImages(parsedImages);
-        } catch (err) {
-            console.error('Failed to load images:', err);
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        loadImages();
-        const interval = setInterval(loadImages, 30000); // Refresh every 30 seconds
-        return () => clearInterval(interval);
-    }, []);
+    const shown = React.useMemo(
+        () => (images ?? []).filter(img => img.UsedByCompose),
+        [images]);
 
     const handlePullNewImage = async () => {
         if (!pullImageInput.trim()) {
@@ -164,44 +64,30 @@ export const ComposeImages: React.FC = () => {
 
         try {
             setIsPulling(true);
-            setError(null);
-            await cockpit.spawn(['docker', 'pull', pullImageInput.trim()], { err: 'message' });
+            await pullImage(pullImageInput.trim());
             setPullImageInput(''); // Clear input after successful pull
-            await loadImages(); // Reload after pull
+            await reload();
         } catch (err) {
-            console.error('Failed to pull image:', err);
-            setError(err instanceof Error ? err.message : String(err));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setIsPulling(false);
         }
     };
 
     const handleCleanupUnusedImages = async () => {
+        const unusedImages = (images ?? []).filter(img => !img.UsedByCompose);
+        if (unusedImages.length === 0) {
+            return;
+        }
+
         try {
             setIsCleaning(true);
-            setError(null);
-
-            // Get all unused images
-            const unusedImages = images.filter(img => !img.UsedByCompose);
-
-            if (unusedImages.length === 0) {
-                return;
-            }
-
-            // Remove each unused image
             for (const image of unusedImages) {
-                try {
-                    await cockpit.spawn(['docker', 'rmi', image.ID], { err: 'message' });
-                } catch (err) {
-                    console.error(`Failed to remove image ${image.ID}:`, err);
-                    // Continue with other images even if one fails
-                }
+                await removeImage(image.ID);
             }
-
-            await loadImages(); // Reload after cleanup
+            await reload();
         } catch (err) {
-            console.error('Failed to cleanup images:', err);
-            setError(err instanceof Error ? err.message : String(err));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setIsCleaning(false);
         }
@@ -209,11 +95,10 @@ export const ComposeImages: React.FC = () => {
 
     const handleRemoveImage = async (imageId: string) => {
         try {
-            await cockpit.spawn(['docker', 'rmi', imageId], { err: 'message' });
-            await loadImages(); // Reload after removal
+            await removeImage(imageId);
+            await reload();
         } catch (err) {
-            console.error('Failed to remove image:', err);
-            setError(err instanceof Error ? err.message : String(err));
+            setActionError(err instanceof Error ? err : new Error(String(err)));
         }
     };
 
@@ -236,22 +121,7 @@ export const ComposeImages: React.FC = () => {
                     <EmptyState>
                         <EmptyStateBody>
                             <strong>{_("Error loading images")}</strong><br />
-                            {error}
-                        </EmptyStateBody>
-                    </EmptyState>
-                </CardBody>
-            </Card>
-        );
-    }
-
-    if (images.length === 0) {
-        return (
-            <Card>
-                <CardBody>
-                    <EmptyState>
-                        <EmptyStateBody>
-                            <strong>{_("No images found")}</strong><br />
-                            {_("No Docker images are available on this system.")}
+                            {error.message}
                         </EmptyStateBody>
                     </EmptyState>
                 </CardBody>
@@ -268,7 +138,7 @@ export const ComposeImages: React.FC = () => {
         { title: _("Actions"), sortable: false }
     ];
 
-    const unusedCount = images.filter(img => !img.UsedByCompose).length;
+    const unusedCount = (images ?? []).filter(img => !img.UsedByCompose).length;
 
     return (
         <Card id="compose-images">
@@ -291,74 +161,86 @@ export const ComposeImages: React.FC = () => {
                                 />
                             </InputGroupItem>
                             <InputGroupItem>
-                                <Button
+                                <DockerActionButton
                                     variant="primary"
                                     icon={<DownloadIcon />}
                                     onClick={handlePullNewImage}
-                                    isLoading={isPulling}
                                     isDisabled={isPulling || isCleaning || !pullImageInput.trim()}
                                 >
                                     {isPulling ? _("Pulling...") : _("Pull Image")}
-                                </Button>
+                                </DockerActionButton>
                             </InputGroupItem>
                         </InputGroup>
                     </FlexItem>
                     {unusedCount > 0 && (
                         <FlexItem>
-                            <Button
+                            <DockerActionButton
                                 variant="danger"
                                 icon={<TrashIcon />}
                                 onClick={handleCleanupUnusedImages}
-                                isLoading={isCleaning}
                                 isDisabled={isPulling || isCleaning}
                             >
-                                {isCleaning ? _("Cleaning up...") : _(`Cleanup ${unusedCount} unused image${unusedCount > 1 ? 's' : ''}`)}
-                            </Button>
+                                {isCleaning
+                                    ? _("Cleaning up...")
+                                    : cockpit.format(cockpit.ngettext("Cleanup $0 unused image", "Cleanup $0 unused images", unusedCount), unusedCount)}
+                            </DockerActionButton>
                         </FlexItem>
                     )}
                 </Flex>
             </CardTitle>
             <CardBody>
-                <ListingTable
-                    aria-label="Docker images"
-                    columns={columnTitles}
-                    rows={images.map((image) => ({
-                        columns: [
-                            { title: image.Repository },
-                            { title: image.Tag },
-                            { title: image.ID.substring(0, 12) },
-                            { title: image.Size },
-                            {
-                                title: image.UsedByCompose
-                                    ? (
-                                        <Flex spaceItems={{ default: 'spaceItemsXs' }}>
-                                            {image.ComposeProjects.map(project => (
-                                                <FlexItem key={project}>
-                                                    <Label color="blue">{project}</Label>
-                                                </FlexItem>
-                                            ))}
-                                        </Flex>
-                                    )
-                                    : <Label color="grey">{_("Unused")}</Label>
-                            },
-                            {
-                                title: !image.UsedByCompose
-                                    ? (
-                                        <Button
-                                            variant="danger"
-                                            size="sm"
-                                            icon={<TrashIcon />}
-                                            onClick={() => handleRemoveImage(image.ID)}
-                                            isDisabled={isPulling || isCleaning}
-                                        >
-                                            {_("Remove")}
-                                        </Button>
-                                    )
-                                    : null
-                            }
-                        ]
-                    }))}
-                />
+                <ActionError error={actionError} onDismiss={() => setActionError(null)} />
+                {shown.length === 0
+                    ? (
+                        <EmptyState>
+                            <EmptyStateBody>
+                                <strong>{_("No compose images found")}</strong><br />
+                                {_("No images used by Docker Compose projects are currently available.")}
+                            </EmptyStateBody>
+                        </EmptyState>
+                    )
+                    : (
+                        <ListingTable
+                            aria-label="Docker images"
+                            columns={columnTitles}
+                            rows={shown.map((image) => ({
+                                columns: [
+                                    { title: image.Repository },
+                                    { title: image.Tag },
+                                    { title: image.ID.substring(0, 12) },
+                                    { title: image.Size },
+                                    {
+                                        title: image.UsedByCompose
+                                            ? (
+                                                <Flex spaceItems={{ default: 'spaceItemsXs' }}>
+                                                    {image.ComposeProjects.map(project => (
+                                                        <FlexItem key={project}>
+                                                            <Label color="blue">{project}</Label>
+                                                        </FlexItem>
+                                                    ))}
+                                                </Flex>
+                                            )
+                                            : <Label color="grey">{_("Unused")}</Label>
+                                    },
+                                    {
+                                        title: !image.UsedByCompose
+                                            ? (
+                                                <DockerActionButton
+                                                    variant="danger"
+                                                    size="sm"
+                                                    icon={<TrashIcon />}
+                                                    onClick={() => handleRemoveImage(image.ID)}
+                                                    isDisabled={isPulling || isCleaning}
+                                                >
+                                                    {_("Remove")}
+                                                </DockerActionButton>
+                                            )
+                                            : null
+                                    }
+                                ]
+                            }))}
+                        />
+                    )}
             </CardBody>
         </Card>
     );

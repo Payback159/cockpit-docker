@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import cockpit from 'cockpit';
 import {
     Card,
@@ -36,6 +36,8 @@ import {
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { NetworkIcon } from '@patternfly/react-icons';
 import { ListingTable } from "cockpit-components-table.jsx";
+import { listContainers, type ContainerSummary } from '../client';
+import { useDockerResource } from '../hooks/useDockerResource';
 
 const _ = cockpit.gettext;
 
@@ -49,110 +51,54 @@ interface PortMapping {
     state: string;
 }
 
-export const PortMapping: React.FC = () => {
-    const [ports, setPorts] = useState<PortMapping[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const loadPorts = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Get all containers with port mappings
-            const result = await cockpit.spawn(
-                ['docker', 'ps', '-a', '--format', 'json'],
-                { err: 'message' }
-            );
-
-            if (!result || result.trim() === '') {
-                setPorts([]);
-                return;
+function toPortMappings(containers: ContainerSummary[]): PortMapping[] {
+    const mappings: PortMapping[] = [];
+    for (const container of containers) {
+        if (!container.Ports)
+            continue;
+        for (const entry of container.Ports.split(', ')) {
+            const hostMapping = entry.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+)\/(tcp|udp)$/);
+            const containerOnly = entry.match(/^(\d+)\/(tcp|udp)$/);
+            if (hostMapping) {
+                mappings.push({
+                    containerName: container.Name,
+                    containerPort: hostMapping[3],
+                    hostPort: hostMapping[2],
+                    protocol: hostMapping[4].toUpperCase(),
+                    hostIP: hostMapping[1],
+                    project: container.Project,
+                    state: container.State,
+                });
+            } else if (containerOnly) {
+                mappings.push({
+                    containerName: container.Name,
+                    containerPort: containerOnly[1],
+                    hostPort: '-',
+                    protocol: containerOnly[2].toUpperCase(),
+                    hostIP: '-',
+                    project: container.Project,
+                    state: container.State,
+                });
             }
-
-            // Parse NDJSON
-            const lines = result.trim().split('\n');
-            const mappings: PortMapping[] = [];
-
-            lines.forEach(line => {
-                const container = JSON.parse(line);
-                const portsStr = container.Ports || '';
-
-                // Parse labels for project name
-                const labels: Record<string, string> = {};
-                if (container.Labels) {
-                    const labelPairs = container.Labels.split(',');
-                    labelPairs.forEach((pair: string) => {
-                        const [key, ...valueParts] = pair.split('=');
-                        if (key && valueParts.length > 0) {
-                            labels[key] = valueParts.join('=');
-                        }
-                    });
-                }
-
-                const project = labels['com.docker.compose.project'] || '-';
-
-                // Parse ports string
-                // Format: "0.0.0.0:8080->80/tcp, 0.0.0.0:8443->443/tcp"
-                if (portsStr) {
-                    const portEntries = portsStr.split(', ');
-                    portEntries.forEach((entry: string) => {
-                        // Match pattern: "0.0.0.0:8080->80/tcp" or "80/tcp" (no host port)
-                        const hostMapping = entry.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)->(\d+)\/(tcp|udp)$/);
-                        const containerOnly = entry.match(/^(\d+)\/(tcp|udp)$/);
-
-                        if (hostMapping) {
-                            mappings.push({
-                                containerName: container.Names,
-                                containerPort: hostMapping[3],
-                                hostPort: hostMapping[2],
-                                protocol: hostMapping[4].toUpperCase(),
-                                hostIP: hostMapping[1],
-                                project,
-                                state: container.State
-                            });
-                        } else if (containerOnly) {
-                            // Port exposed but not mapped to host
-                            mappings.push({
-                                containerName: container.Names,
-                                containerPort: containerOnly[1],
-                                hostPort: '-',
-                                protocol: containerOnly[2].toUpperCase(),
-                                hostIP: '-',
-                                project,
-                                state: container.State
-                            });
-                        }
-                    });
-                }
-            });
-
-            // Sort by host port (numeric), then container name
-            mappings.sort((a, b) => {
-                if (a.hostPort === '-' && b.hostPort === '-') return a.containerName.localeCompare(b.containerName);
-                if (a.hostPort === '-') return 1;
-                if (b.hostPort === '-') return -1;
-                const portA = parseInt(a.hostPort);
-                const portB = parseInt(b.hostPort);
-                if (portA !== portB) return portA - portB;
-                return a.containerName.localeCompare(b.containerName);
-            });
-
-            setPorts(mappings);
-        } catch (err) {
-            console.error('Failed to load port mappings:', err);
-            setError(err instanceof Error ? err.message : String(err));
-        } finally {
-            setLoading(false);
         }
-    };
+    }
+    mappings.sort((a, b) => {
+        if (a.hostPort === '-' && b.hostPort === '-')
+            return a.containerName.localeCompare(b.containerName);
+        if (a.hostPort === '-') return 1;
+        if (b.hostPort === '-') return -1;
+        const diff = parseInt(a.hostPort) - parseInt(b.hostPort);
+        return diff !== 0 ? diff : a.containerName.localeCompare(b.containerName);
+    });
+    return mappings;
+}
 
-    useEffect(() => {
-        loadPorts();
-        // Refresh every 30 seconds
-        const interval = setInterval(loadPorts, 30000);
-        return () => clearInterval(interval);
-    }, []);
+export const PortMapping: React.FC = () => {
+    const { data: containers, loading, error } = useDockerResource(
+        () => listContainers({ composeOnly: true }),
+        { events: ['container'], tab: 5 });
+
+    const ports = React.useMemo(() => toPortMappings(containers ?? []), [containers]);
 
     const getStateLabel = (state: string) => {
         const stateLower = state.toLowerCase();
@@ -182,7 +128,7 @@ export const PortMapping: React.FC = () => {
     if (error) {
         return (
             <Alert variant={AlertVariant.danger} title={_("Error loading port mappings")}>
-                {error}
+                {error.message}
             </Alert>
         );
     }

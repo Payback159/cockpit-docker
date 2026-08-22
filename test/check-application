@@ -6,47 +6,52 @@
 
 import testlib
 
+# The tabs src/app.tsx renders unconditionally, in order. They are present
+# whether or not Docker is installed; only their enabled state changes.
+TABS = (
+    "Overview",
+    "Containers",
+    "Compose Projects",
+    "Images",
+    "Volumes",
+    "Port Mappings",
+)
 
-# Nondestructive tests all run in the same running VM. This allows them to run in Packit, Fedora, and
-# RHEL dist-git gating. They must not permanently change any file or configuration on the system in a
-# way that influences other tests.
+
+# Nondestructive: this module only reads (docker info, docker compose ls,
+# docker ps), so it can share a VM with other tests.
 @testlib.nondestructive
 class TestApplication(testlib.MachineCase):
     def testBasic(self):
         b = self.browser
         m = self.machine
 
-        self.login_and_go("/starter-kit")
-        # verify expected heading
-        b.wait_text(".pf-v6-c-card__title", "Starter Kit")
+        self.login_and_go("/cockpit-docker")
 
-        # verify expected host name
-        hostname = m.execute("cat /etc/hostname").strip()
-        b.wait_in_text(".pf-v6-c-alert__title", "Running on " + hostname)
+        # Stage 1, invariant. This is the load-bearing assertion: the module
+        # loads, React mounts, and the manifest is picked up. It holds on any
+        # machine, with or without Docker.
+        for tab in TABS:
+            b.wait_in_text(".pf-v6-c-tabs__list", tab)
 
-        # change current hostname
-        self.write_file("/etc/hostname", "new-" + hostname)
-        # verify new hostname name
-        b.wait_in_text(".pf-v6-c-alert__title", "Running on new-" + hostname)
-
-        # change language to German
+        # The menu label comes from src/manifest.json.
         b.switch_to_top()
-        # the menu and dialog changed several times
-        b.click("#toggle-menu")
-        b.click("button.display-language-menu")
-        b.wait_popup('display-language-modal')
-        b.click("#display-language-modal [data-value='de-de'] button")
-        b.click("#display-language-modal button.pf-m-primary")
-        b.wait_visible("#content")
-        # menu label (from manifest) should be translated
-        b.wait_text("#host-apps a[href='/starter-kit']", "Bausatz")
-        # window title should be translated; this is not considered as "visible"
-        self.assertIn("Bausatz", b.call_js_func("ph_text", "head title"))
+        b.wait_text("#host-apps a[href='/cockpit-docker']", "Docker")
+        b.go("/cockpit-docker")
+        b.enter_page("/cockpit-docker")
 
-        b.go("/starter-kit")
-        b.enter_page("/starter-kit")
-        # page label (from js) should be translated
-        b.wait_in_text(".pf-v6-c-alert__title", "Läuft auf")
+        # Stage 2, state-dependent. Whether this machine has Docker is not
+        # known in advance, so ask it rather than weaken the assertion to
+        # "one of the two".
+        if m.execute("command -v docker || true").strip():
+            # DockerProvider settled on an access mode and checkSystem came
+            # back; the Overview tab shows the daemon's own numbers.
+            b.wait_in_text(".pf-v6-c-card__title", "Docker System Status")
+        else:
+            # probeAccess classified the failure as not-installed, so
+            # DockerProvider raised it module-wide and the banner took over.
+            # This also covers one of the five classified error kinds.
+            b.wait_in_text(".pf-v6-c-alert__title", "Docker is not installed")
 
 
 if __name__ == '__main__':

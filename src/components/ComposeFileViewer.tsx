@@ -128,31 +128,14 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             width="85%"
         >
             {/* Header with the file path */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 0',
-                    borderBottom: '1px solid var(--pf-v6-global--BorderColor--100)',
-                    marginBottom: '0.75rem'
-                }}
-            >
-                <div
-                    style={{
-                        fontSize: '0.875rem',
-                        color: 'var(--pf-v6-global--Color--200)',
-                        fontFamily: 'monospace',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                    }}
-                >
+            <div className="ct-panel-header">
+                <div className="ct-panel-header__path">
                     📄 {configPath}
                 </div>
             </div>
 
             {loading && (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div className="ct-centered-status">
                     <Spinner size="lg" /> {_("Loading compose file...")}
                 </div>
             )}
@@ -164,19 +147,10 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             )}
 
             {!loading && !error && (
-                <div
-                    style={{
-                        height: 'calc(85vh - 160px)',
-                        overflow: 'auto',
-                        marginBottom: '1rem',
-                        padding: '1rem',
-                        background: 'var(--pf-v6-global--BackgroundColor--dark--100)',
-                        borderRadius: '8px'
-                    }}
-                >
+                <div className="ct-scroll-pane ct-scroll-pane--file">
                     <CodeBlock>
-                        <CodeBlockCode style={{ fontSize: '13px', lineHeight: '1.6' }}>
-                            <pre style={{ margin: 0 }}>
+                        <CodeBlockCode className="ct-code-file">
+                            <pre className="ct-code-pre">
                                 {highlightedCode
                                     ? <code className="hljs language-yaml" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
                                     : <code className="hljs language-yaml">{content}</code>}
@@ -187,15 +161,7 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             )}
 
             {/* Footer with buttons */}
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '0.5rem',
-                    padding: '1rem',
-                    borderTop: '1px solid var(--pf-v6-global--BorderColor--100)'
-                }}
-            >
+            <div className="ct-panel-footer ct-panel-footer--spaced">
                 <Button
                     variant="secondary"
                     icon={<DownloadIcon />}

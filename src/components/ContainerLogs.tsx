@@ -173,17 +173,8 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
             isOpen={isOpen}
             onClose={handleClose}
         >
-            {/* Toolbar oben */}
-            <div
-                style={{
-                    display: 'flex',
-                    gap: '1.5rem',
-                    alignItems: 'center',
-                    padding: '0.5rem 0',
-                    borderBottom: '1px solid var(--pf-t--global--border--color--default)',
-                    marginBottom: '0.75rem'
-                }}
-            >
+            {/* Toolbar */}
+            <div className="ct-panel-header ct-panel-header--toolbar">
                 <Checkbox
                     id="follow-logs"
                     label={follow ? _("Following logs...") : _("Follow logs")}
@@ -191,13 +182,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                     onChange={(_event, checked) => setFollow(checked)}
                 />
                 {follow && (
-                    <span
-                        style={{
-                            fontSize: '0.875rem',
-                            color: 'var(--pf-t--global--icon--color--status--success--default)',
-                            fontWeight: 600
-                        }}
-                    >
+                    <span className="ct-live-indicator">
                         🟢 Live
                     </span>
                 )}
@@ -206,17 +191,10 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
             {/* Logs Content */}
             <div
                 ref={logsContainerRef}
-                style={{
-                    height: 'calc(85vh - 160px)',
-                    overflow: 'auto',
-                    background: 'var(--pf-t--global--background--color--secondary--default)',
-                    borderRadius: '8px',
-                    padding: '1rem',
-                    marginBottom: '1rem'
-                }}
+                className="ct-scroll-pane ct-scroll-pane--file"
             >
                 <CodeBlock>
-                    <CodeBlockCode style={{ fontSize: '13px', lineHeight: '1.4', fontFamily: 'monospace' }}>
+                    <CodeBlockCode className="ct-code-logs">
                         {loading && !logs ? _("Loading logs...") : logs || _("No logs available")}
                         <div ref={logsEndRef} />
                     </CodeBlockCode>
@@ -224,15 +202,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
             </div>
 
             {/* Footer with buttons */}
-            <div
-                style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '0.5rem',
-                    padding: '1rem',
-                    borderTop: '1px solid var(--pf-t--global--border--color--default)'
-                }}
-            >
+            <div className="ct-panel-footer ct-panel-footer--spaced">
                 <Button
                     variant="secondary"
                     icon={<DownloadIcon />}

@@ -251,9 +251,17 @@ You can also run the test against a different Cockpit image, for example:
 [GitHub Actions](https://github.com/features/actions) runs on every pull
 request (and on pushes to `main`); see
 [.github/workflows/test.yml](.github/workflows/test.yml). It runs `make test`
-on Node 20 and Node 24, and, on Node 24, `make` followed by `make codecheck`
-— failing the job if that guard (see "Running eslint" above) finds that
-eslint or stylelint was silently skipped.
+on Node 20 and Node 24, and, on Node 24, `make`, `test/check-css-tokens` and
+`make codecheck` — failing the job if that guard (see "Running eslint" above)
+finds that eslint or stylelint was silently skipped.
+
+`test/check-css-tokens` catches styling that does nothing: a CSS custom
+property referenced but never defined (PatternFly 6 renamed its tokens from
+`--pf-v6-global--*` to `--pf-t--global--*`, and `var()` on an undefined
+property voids the whole declaration), or a `pf-v6-u-*` utility class whose
+stylesheet was never bundled. Run it locally after `make`:
+
+    make && test/check-css-tokens
 
 The integration tests described below are covered by Cirrus CI and Packit
 instead, not by GitHub Actions.

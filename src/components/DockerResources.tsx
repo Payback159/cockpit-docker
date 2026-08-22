@@ -30,6 +30,10 @@ import {
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/index.js";
 import {
+    Flex,
+    FlexItem
+} from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+import {
     CubeIcon,
     ImageIcon,
     DatabaseIcon,
@@ -83,53 +87,29 @@ const ResourceCard = ({ icon, title, count, details }: {
     count: number;
     details?: string;
 }) => (
-    <Card isCompact style={{ height: '100%' }}>
-        <CardBody style={{ padding: '1rem' }}>
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-                height: '100%',
-                justifyContent: 'space-between'
-            }}
+    <Card isCompact className="ct-resource-tile">
+        <CardBody>
+            <Flex
+                direction={{ default: 'column' }}
+                spaceItems={{ default: 'spaceItemsSm' }}
+                justifyContent={{ default: 'justifyContentSpaceBetween' }}
+                flexWrap={{ default: 'nowrap' }}
+                className="ct-resource-tile__stack"
             >
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    color: 'var(--pf-v6-global--Color--200)'
-                }}
+                <Flex
+                    alignItems={{ default: 'alignItemsCenter' }}
+                    spaceItems={{ default: 'spaceItemsSm' }}
+                    flexWrap={{ default: 'nowrap' }}
                 >
-                    <div style={{ fontSize: '1.25rem' }}>
-                        {icon}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                        {title}
-                    </div>
-                </div>
+                    <FlexItem className="ct-resource-tile__icon">{icon}</FlexItem>
+                    <FlexItem className="ct-resource-tile__label">{title}</FlexItem>
+                </Flex>
 
-                <div>
-                    <div style={{
-                        fontSize: '2rem',
-                        fontWeight: 'bold',
-                        lineHeight: 1,
-                        color: 'var(--pf-v6-global--primary-color--100)'
-                    }}
-                    >
-                        {count}
-                    </div>
-                    {details && (
-                        <div style={{
-                            fontSize: '0.8125rem',
-                            color: 'var(--pf-v6-global--Color--200)',
-                            marginTop: '0.375rem'
-                        }}
-                        >
-                            {details}
-                        </div>
-                    )}
-                </div>
-            </div>
+                <FlexItem>
+                    <div className="ct-resource-tile__count">{count}</div>
+                    {details && <div className="ct-resource-tile__details">{details}</div>}
+                </FlexItem>
+            </Flex>
         </CardBody>
     </Card>
 );
@@ -174,13 +154,14 @@ export const DockerResources: React.FC = () => {
         <Card>
             <CardTitle>{_("Resources Overview")}</CardTitle>
             <CardBody>
-                <div style={{
-                    display: 'flex',
-                    gap: '0.75rem',
-                    flexWrap: 'wrap'
-                }}
+                {/* PatternFly's Flex aligns on the baseline by default; the
+                    tiles have to stretch so a tile with a details line does
+                    not make its neighbours shorter. */}
+                <Flex
+                    spaceItems={{ default: 'spaceItemsSm' }}
+                    alignItems={{ default: 'alignItemsStretch' }}
                 >
-                    <div style={{ flex: '1 1 0', minWidth: '200px' }}>
+                    <FlexItem flex={{ default: 'flex_1' }} className="ct-resource-tile__slot">
                         <ResourceCard
                             icon={<CubeIcon />}
                             title={_("Containers")}
@@ -189,29 +170,29 @@ export const DockerResources: React.FC = () => {
                                 _("$0 running, $1 stopped"),
                                 stats.containers.running, stats.containers.stopped)}
                         />
-                    </div>
-                    <div style={{ flex: '1 1 0', minWidth: '200px' }}>
+                    </FlexItem>
+                    <FlexItem flex={{ default: 'flex_1' }} className="ct-resource-tile__slot">
                         <ResourceCard
                             icon={<ImageIcon />}
                             title={_("Images")}
                             count={stats.images}
                         />
-                    </div>
-                    <div style={{ flex: '1 1 0', minWidth: '200px' }}>
+                    </FlexItem>
+                    <FlexItem flex={{ default: 'flex_1' }} className="ct-resource-tile__slot">
                         <ResourceCard
                             icon={<DatabaseIcon />}
                             title={_("Volumes")}
                             count={stats.volumes}
                         />
-                    </div>
-                    <div style={{ flex: '1 1 0', minWidth: '200px' }}>
+                    </FlexItem>
+                    <FlexItem flex={{ default: 'flex_1' }} className="ct-resource-tile__slot">
                         <ResourceCard
                             icon={<NetworkIcon />}
                             title={_("Networks")}
                             count={stats.networks}
                         />
-                    </div>
-                </div>
+                    </FlexItem>
+                </Flex>
             </CardBody>
         </Card>
     );

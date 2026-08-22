@@ -235,7 +235,7 @@ export const ComposeProjects: React.FC = () => {
                     onClose={() => setConfirmDown(null)}
                 >
                     <p>{cockpit.format(_("This removes every container of project $0. Volumes are kept."), confirmDown)}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <div className="ct-block-spaced">
                         <Button variant="danger" onClick={() => { const n = confirmDown; setConfirmDown(null); handleProjectAction(n, 'down') }}>
                             {_("Remove")}
                         </Button>{' '}

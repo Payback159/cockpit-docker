@@ -252,7 +252,7 @@ export const ComposeImages: React.FC = () => {
                             unusedCount)}
                     </p>
                     <p>{_("These images are not shown in this list, because the list only shows images used by Compose projects.")}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <div className="ct-block-spaced">
                         <Button
                             variant="danger"
                             onClick={() => { setConfirmCleanup(false); handleCleanupUnusedImages() }}

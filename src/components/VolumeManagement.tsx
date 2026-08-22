@@ -157,15 +157,7 @@ export const VolumeManagement: React.FC = () => {
                 {
                     title: (
                         <span
-                            style={{
-                                fontFamily: 'monospace',
-                                fontSize: '0.875rem',
-                                maxWidth: '300px',
-                                display: 'inline-block',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                            }}
+                            className="ct-truncate-path"
                             title={volume.Mountpoint}
                         >
                             {volume.Mountpoint}
@@ -175,7 +167,7 @@ export const VolumeManagement: React.FC = () => {
                 {
                     title: project !== '-'
                         ? <Label color="green">{project}</Label>
-                        : <span style={{ color: 'var(--pf-v6-global--Color--200)' }}>-</span>
+                        : <span className="ct-empty-value">-</span>
                 },
                 { title: formatDate(volume.CreatedAt) },
                 {
@@ -274,7 +266,7 @@ export const VolumeManagement: React.FC = () => {
                     onClose={() => setConfirmRemove(null)}
                 >
                     <p>{cockpit.format(_("Remove volume $0? This cannot be undone."), confirmRemove)}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <div className="ct-block-spaced">
                         <Button variant="danger" onClick={() => { const n = confirmRemove; setConfirmRemove(null); handleRemoveVolume(n) }}>
                             {_("Remove")}
                         </Button>{' '}
@@ -293,7 +285,7 @@ export const VolumeManagement: React.FC = () => {
                 >
                     <p>{_("This removes every volume not used by at least one container. This cannot be undone.")}</p>
                     <p>{_("This also removes volumes not shown in this list, because they do not belong to a Compose project.")}</p>
-                    <div className="pf-v6-u-mt-md">
+                    <div className="ct-block-spaced">
                         <Button variant="danger" onClick={() => { setConfirmPrune(false); handlePruneVolumes() }}>
                             {_("Prune")}
                         </Button>{' '}

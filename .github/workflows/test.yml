@@ -61,6 +61,12 @@ jobs:
       - name: Build
         run: make
 
+      # A style that references an undefined token, or a utility class whose
+      # stylesheet was never bundled, builds and lints cleanly and then does
+      # nothing at all. Both were live defects here before this check existed.
+      - name: Check CSS tokens and utility classes resolve
+        run: test/check-css-tokens
+
       - name: Static code checks
         run: |
           # Without pipefail, tee would mask a failing make.

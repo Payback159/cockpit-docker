@@ -194,6 +194,14 @@ verify_mount() {
     check "Cockpit recognises the module" \
         sh -c "docker exec -u devel cockpit-docker-devenv cockpit-bridge --packages | grep -q cockpit-docker"
 
+    # The property that makes the watch flow survive a rebuild: the module path
+    # is a symlink into the mounted checkout, resolved on every access. A bind
+    # mount of dist/ binds one inode, and build.js replaces that directory on
+    # every build -- the container then keeps looking at the orphaned one and
+    # the module disappears from Cockpit.
+    check "module path is a symlink, not a bind mount of dist/" \
+        sh -c "docker exec cockpit-docker-devenv test -L /usr/local/share/cockpit/cockpit-docker"
+
     # Watch flow: a change to dist/ must be visible in the container at once,
     # without a restart.
     marker="devenv-mount-probe-$$"

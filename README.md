@@ -137,12 +137,18 @@ access) or as `admin` / `admin` (an administrator who is *not* in the `docker`
 group, so the module has to escalate). Sample Compose projects are loaded
 automatically.
 
-The build output in `dist/` is mounted into the container, so running
+The checkout is mounted into the container, and the module directory is a
+symlink to `dist/` inside it, so running
 
     make watch
 
 in a second terminal is enough — reload the browser to see your changes. No
 rebuild of the container, no redeploy.
+
+The symlink matters: `build.js` removes `dist/` and lets esbuild recreate it,
+so a bind mount of that directory would bind one inode and go stale on the
+first rebuild — the module would vanish from Cockpit with "Not found" and no
+hint why. A symlink is resolved on every access instead.
 
 To stop it and remove the storage volumes:
 

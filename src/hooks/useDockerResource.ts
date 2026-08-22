@@ -61,6 +61,12 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
     const generation = useRef(0);
 
     const visible = opts.tab === undefined || opts.tab === activeTab;
+    // Ereignis-Arrays sind bei jedem Aufrufer-Render ein neues Literal
+    // (`{ events: ['container'] }`); ein Vergleich nach Referenz wuerde das
+    // Abonnement bei jedem Tastendruck ab- und wiederaufbauen. Ein aus dem
+    // Inhalt gebildeter String ist stabil, solange die Ereignistypen
+    // gleich bleiben.
+    const eventKey = (opts.events ?? []).join(',');
 
     const reload = useCallback(async () => {
         const gen = ++generation.current;
@@ -100,7 +106,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
     useEffect(() => {
         if (!ready || fatalError)
             return;
-        const types = opts.events ?? [];
+        const types = eventKey === '' ? [] : eventKey.split(',');
         if (types.length === 0)
             return;
         return subscribe(types, () => {
@@ -109,7 +115,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
             else
                 staleWhileHidden.current = true;
         });
-    }, [ready, fatalError, subscribe, reload, activeTab, opts.events, opts.tab]);
+    }, [ready, fatalError, subscribe, reload, activeTab, eventKey, opts.tab]);
 
     // Sicherheitsnetz gegen einen abgerissenen Ereignisstrom.
     useEffect(() => {

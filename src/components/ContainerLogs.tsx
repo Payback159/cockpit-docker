@@ -24,7 +24,7 @@ import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { CodeBlock, CodeBlockCode } from "@patternfly/react-core/dist/esm/components/CodeBlock/index.js";
 import DownloadIcon from '@patternfly/react-icons/dist/esm/icons/download-icon';
-import { containerLogs, followLogs } from '../client';
+import { containerLogs, followLogs, type DockerError } from '../client';
 
 const _ = cockpit.gettext;
 
@@ -66,15 +66,29 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 stopFollowing();
 
                 // Start following logs
-                const handle = followLogs(containerName, chunk => {
-                    setLogs(prev => prev + stripAnsiCodes(chunk));
-                    // Auto-scroll in next tick
-                    setTimeout(() => {
-                        if (logsContainerRef.current) {
-                            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
-                        }
-                    }, 0);
-                });
+                const handle = followLogs(
+                    containerName,
+                    chunk => {
+                        setLogs(prev => prev + stripAnsiCodes(chunk));
+                        // Auto-scroll in next tick
+                        setTimeout(() => {
+                            if (logsContainerRef.current) {
+                                logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+                            }
+                        }, 0);
+                    },
+                    (streamErr: DockerError) => {
+                        // Der Stream ist bereits beendet, wenn dieser Callback
+                        // feuert -- ohne diese Meldung wuerde ein abgerissenes
+                        // `docker logs -f` (z.B. Container entfernt) im
+                        // Hintergrund verschwinden, ohne dass die Anzeige es
+                        // zeigt.
+                        console.error('Failed to follow logs:', streamErr);
+                        setLogs(prev => prev + '\n' + _("Error following logs: ") + streamErr.message);
+                        isFollowingRef.current = false;
+                        setFollow(false);
+                    }
+                );
 
                 followProcessRef.current = handle;
                 isFollowingRef.current = true;

@@ -80,25 +80,31 @@ export const ComposeImages: React.FC = () => {
             return;
         }
 
-        try {
-            setIsCleaning(true);
-            for (const image of unusedImages) {
+        setIsCleaning(true);
+        // Jedes Image einzeln versuchen: ein einzelner haengender Container
+        // (docker rmi schlaegt fehl, solange irgendein Container das Image
+        // noch referenziert) darf nicht den ganzen Aufraeumlauf abbrechen --
+        // die uebrigen Images sind davon unabhaengig entfernbar. Erst nach
+        // dem vollstaendigen Durchlauf wird neu geladen und ein
+        // gesammelter Fehler gemeldet, falls welche uebrig blieben.
+        const failed: string[] = [];
+        for (const image of unusedImages) {
+            try {
                 await removeImage(image.ID);
+            } catch (err) {
+                failed.push(image.ID);
+                console.warn('Image konnte nicht entfernt werden:', image.ID, err);
             }
-            await reload();
-        } catch (err) {
-            setActionError(err instanceof Error ? err : new Error(String(err)));
-        } finally {
-            setIsCleaning(false);
         }
-    };
-
-    const handleRemoveImage = async (imageId: string) => {
-        try {
-            await removeImage(imageId);
-            await reload();
-        } catch (err) {
-            setActionError(err instanceof Error ? err : new Error(String(err)));
+        await reload();
+        setIsCleaning(false);
+        if (failed.length > 0) {
+            setActionError(new Error(cockpit.format(
+                cockpit.ngettext(
+                    "$0 image could not be removed: $1",
+                    "$0 images could not be removed: $1",
+                    failed.length),
+                failed.length, failed.join(', '))));
         }
     };
 
@@ -134,8 +140,7 @@ export const ComposeImages: React.FC = () => {
         { title: _("Tag"), sortable: true },
         { title: _("Image ID"), sortable: true },
         { title: _("Size"), sortable: true },
-        { title: _("Used By"), sortable: false },
-        { title: _("Actions"), sortable: false }
+        { title: _("Used By"), sortable: false }
     ];
 
     const unusedCount = (images ?? []).filter(img => !img.UsedByCompose).length;
@@ -210,32 +215,15 @@ export const ComposeImages: React.FC = () => {
                                     { title: image.ID.substring(0, 12) },
                                     { title: image.Size },
                                     {
-                                        title: image.UsedByCompose
-                                            ? (
-                                                <Flex spaceItems={{ default: 'spaceItemsXs' }}>
-                                                    {image.ComposeProjects.map(project => (
-                                                        <FlexItem key={project}>
-                                                            <Label color="blue">{project}</Label>
-                                                        </FlexItem>
-                                                    ))}
-                                                </Flex>
-                                            )
-                                            : <Label color="grey">{_("Unused")}</Label>
-                                    },
-                                    {
-                                        title: !image.UsedByCompose
-                                            ? (
-                                                <DockerActionButton
-                                                    variant="danger"
-                                                    size="sm"
-                                                    icon={<TrashIcon />}
-                                                    onClick={() => handleRemoveImage(image.ID)}
-                                                    isDisabled={isPulling || isCleaning}
-                                                >
-                                                    {_("Remove")}
-                                                </DockerActionButton>
-                                            )
-                                            : null
+                                        title: (
+                                            <Flex spaceItems={{ default: 'spaceItemsXs' }}>
+                                                {image.ComposeProjects.map(project => (
+                                                    <FlexItem key={project}>
+                                                        <Label color="blue">{project}</Label>
+                                                    </FlexItem>
+                                                ))}
+                                            </Flex>
+                                        )
                                     }
                                 ]
                             }))}

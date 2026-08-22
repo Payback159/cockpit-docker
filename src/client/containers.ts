@@ -20,6 +20,7 @@
 /* Container: auflisten, steuern, Logs. */
 import { run, stream } from './spawn';
 import { parseJsonList, parseLabels } from './parse';
+import type { DockerError } from './errors';
 import type { ContainerSummary } from './types';
 
 interface RawContainer {
@@ -81,7 +82,8 @@ export async function containerLogs(name: string, tail = 1000): Promise<string> 
 
 export function followLogs(
     name: string,
-    onData: (chunk: string) => void
+    onData: (chunk: string) => void,
+    onError?: (err: DockerError) => void
 ): { close: () => void } {
-    return stream(['docker', 'logs', '-f', '--tail', '100', name], onData);
+    return stream(['docker', 'logs', '-f', '--tail', '100', name], onData, onError);
 }

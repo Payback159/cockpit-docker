@@ -16,8 +16,8 @@ async function primeAccess() {
     resetMock();
 }
 
-// `docker compose ls` liefert ein Array ...
-test('listProjects parst die Array-Ausgabe', async () => {
+// `docker compose ls` returns an array ...
+test('listProjects parses the array output', async () => {
     await primeAccess();
     setSpawnHandler(() => '[{"Name":"a","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]');
     const out = await listProjects();
@@ -25,24 +25,24 @@ test('listProjects parst die Array-Ausgabe', async () => {
     assert.equal(out[0].Name, 'a');
 });
 
-// ... aber der Aufrufer verlaesst sich nicht darauf.
-test('listProjects parst dieselbe Nutzlast auch als NDJSON', async () => {
+// ... but the caller does not rely on that.
+test('listProjects parses the same payload as NDJSON too', async () => {
     await primeAccess();
     setSpawnHandler(() => '{"Name":"a","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}');
     const out = await listProjects();
     assert.equal(out[0].Name, 'a');
 });
 
-test('listProjects liefert bei leerer Ausgabe eine leere Liste', async () => {
+test('listProjects returns an empty list for empty output', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
     assert.deepEqual(await listProjects(), []);
 });
 
-// `docker compose ps` liefert NDJSON: eine Zeile je Service. Ein JSON.parse
-// ueber die Gesamtausgabe scheitert ab dem zweiten Service -- genau der
-// Fehler, den die alte Implementierung hatte.
-test('listServices parst mehrzeiliges NDJSON', async () => {
+// `docker compose ps` returns NDJSON: one line per service. A JSON.parse over
+// the whole output fails from the second service onwards -- exactly the bug the
+// old implementation had.
+test('listServices parses multi-line NDJSON', async () => {
     await primeAccess();
     setSpawnHandler(() =>
         '{"ID":"1","Name":"a-one-1","Service":"one","State":"running"}\n' +
@@ -52,21 +52,21 @@ test('listServices parst mehrzeiliges NDJSON', async () => {
     assert.deepEqual(out.map(s => s.Service), ['one', 'two']);
 });
 
-test('listServices spricht das Projekt ueber --project-name an', async () => {
+test('listServices addresses the project through --project-name', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
-    await listServices('meinprojekt');
+    await listServices('myproject');
     const args = recordedCalls()[0].args;
     assert.ok(args.includes('--project-name'));
-    assert.equal(args[args.indexOf('--project-name') + 1], 'meinprojekt');
-    // ConfigFiles darf nie als -f-Argument auftauchen.
+    assert.equal(args[args.indexOf('--project-name') + 1], 'myproject');
+    // ConfigFiles must never show up as a -f argument.
     assert.ok(!args.includes('-f'));
 });
 
-test('ein unbekanntes Projekt ist kein Fehler, sondern eine leere Liste', async () => {
+test('an unknown project is not an error but an empty list', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
-    assert.deepEqual(await listServices('gibtsnicht'), []);
+    assert.deepEqual(await listServices('does-not-exist'), []);
 });
 
 for (const [fn, expected] of [
@@ -76,7 +76,7 @@ for (const [fn, expected] of [
     [downProject, ['down']],
     [restartProject, ['restart']],
 ] as const) {
-    test(`${expected[0]} verwendet --project-name und kein -f`, async () => {
+    test(`${expected[0]} uses --project-name and no -f`, async () => {
         await primeAccess();
         setSpawnHandler(() => '');
         await fn('p');

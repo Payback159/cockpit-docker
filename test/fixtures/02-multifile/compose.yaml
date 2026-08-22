@@ -1,6 +1,6 @@
-# Basisdatei. Zusammen mit compose.override.yaml erzeugt sie ein ConfigFiles
-# mit ZWEI kommagetrennten Pfaden -- der Fall, an dem ein
-# "-f <pfad,pfad>"-Aufruf scheitert.
+# Base file. Together with compose.override.yaml it produces a ConfigFiles
+# with TWO comma-separated paths -- the case where a "-f <path,path>" call
+# fails.
 services:
   app:
     image: busybox

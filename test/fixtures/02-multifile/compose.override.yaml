@@ -1,4 +1,4 @@
-# Zweite Datei: ergaenzt einen Port und einen weiteren Service.
+# Second file: adds a port and one more service.
 services:
   app:
     ports:

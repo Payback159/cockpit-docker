@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Images: auflisten, holen, entfernen. */
+/* Images: list, pull, remove. */
 import { run } from './spawn';
 import { parseJsonList, parseLabels } from './parse';
 import type { DockerImage } from './types';
@@ -35,12 +35,12 @@ interface RawContainer {
     Labels?: string;
 }
 
-/* `docker ps` meldet das Image so, wie es referenziert wurde: `busybox` oder
- * `busybox:latest`. `docker images` liefert Repository und Tag getrennt, also
- * immer mit Tag. Ohne Normalisierung findet die Zuordnung das Image nicht. */
+/* `docker ps` reports the image the way it was referenced: `busybox` or
+ * `busybox:latest`. `docker images` returns repository and tag separately, so
+ * always with a tag. Without normalisation the mapping misses the image. */
 function normalizeRef(ref: string): string {
     if (ref.includes('@'))
-        return ref; // Digest-Referenz, siehe unten
+        return ref; // digest reference, see below
     const lastSlash = ref.lastIndexOf('/');
     const colon = ref.indexOf(':', lastSlash + 1);
     return colon === -1 ? `${ref}:latest` : ref;
@@ -53,14 +53,13 @@ export async function listImages(): Promise<DockerImage[]> {
             '--format', 'json']),
     ]);
 
-    // Welches Image gehoert zu welchen Compose-Projekten?
+    // Which image belongs to which compose projects?
     //
-    // Bekannte Grenze: referenziert ein Container sein Image ueber einen
-    // Digest (`repo@sha256:...`), wird es hier nicht zugeordnet. Das
-    // aufzuloesen braeuchte einen zweiten Aufruf (`docker images
-    // --digests`), und Compose-Dateien referenzieren Images in der Praxis
-    // ueber Tags, nicht ueber Digests -- der Fall bleibt daher bewusst
-    // unbehandelt.
+    // Known limitation: if a container references its image by digest
+    // (`repo@sha256:...`), it is not mapped here. Resolving that would need a
+    // second call (`docker images --digests`), and in practice compose files
+    // reference images by tag, not by digest -- so the case is deliberately
+    // left unhandled.
     const projectsByImage = new Map<string, Set<string>>();
     for (const c of parseJsonList<RawContainer>(containersOut)) {
         const project = parseLabels(c.Labels)['com.docker.compose.project'];
@@ -73,8 +72,8 @@ export async function listImages(): Promise<DockerImage[]> {
     }
 
     return parseJsonList<RawImage>(imagesOut).map(img => {
-        // Ein Image ohne Tag (`<none>`) kann ueber seine Referenz nie
-        // getroffen werden -- keinen Schluessel dafuer bilden.
+        // An image without a tag (`<none>`) can never be hit through its
+        // reference -- do not build a key for it.
         const projects = img.Tag === '<none>'
             ? undefined
             : projectsByImage.get(`${img.Repository}:${img.Tag}`);
@@ -91,10 +90,10 @@ export async function listImages(): Promise<DockerImage[]> {
 }
 
 export async function pullImage(ref: string): Promise<void> {
-    // `--` beendet die Optionsliste: die Referenz kommt aus einem freien
-    // Eingabefeld, und ein fuehrender Bindestrich soll nicht als Flag gelesen
-    // werden. Eine Shell ist ohnehin nicht beteiligt (cockpit.spawn nimmt ein
-    // argv), es geht allein um die Argumentzuordnung.
+    // `--` ends the option list: the reference comes from a free-form input
+    // field, and a leading dash must not be read as a flag. No shell is
+    // involved anyway (cockpit.spawn takes an argv); this is purely about
+    // argument assignment.
     await run(['docker', 'pull', '--', ref]);
 }
 

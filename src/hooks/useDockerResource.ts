@@ -17,12 +17,12 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Laedt eine Ressource und haelt sie ueber Docker-Ereignisse aktuell.
+/* Loads a resource and keeps it current through Docker events.
  *
- * Wichtig fuer die Bedienung: `loading` ist nur beim ERSTEN Laden wahr.
- * Spaetere Aktualisierungen setzen `refreshing` und lassen die Anzeige
- * stehen -- das fruehere setLoading(true) im Refresh-Pfad liess die Tabelle
- * alle 30 Sekunden hinter einem Spinner verschwinden.
+ * Important for usability: `loading` is only true for the FIRST load. Later
+ * refreshes set `refreshing` and leave the display standing -- the earlier
+ * setLoading(true) in the refresh path made the table disappear behind a
+ * spinner every 30 seconds.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -30,18 +30,18 @@ import { useDockerContext } from '../DockerProvider';
 import { isDockerError, type DockerError } from '../client';
 
 interface Options {
-    /* Ereignistypen, die eine Neuladung ausloesen (container, image,
-     * volume, network). */
+    /* Event types that trigger a reload (container, image, volume,
+     * network). */
     events?: string[];
-    /* Tab, zu dem diese Ressource gehoert. Ist er nicht sichtbar, wird
-     * nicht geladen; beim Sichtbarwerden wird nachgeholt. */
+    /* Tab this resource belongs to. While it is not visible nothing is
+     * loaded; the load is caught up when it becomes visible. */
     tab?: string | number;
-    /* Sicherheitsnetz, falls der Ereignisstrom abreisst. */
+    /* Safety net in case the event stream tears off. */
     intervalMs?: number;
 }
 
-/* Ursachen, die jeden Tab betreffen (Spec Abschnitt 3): sie gehoeren als
- * Banner ueber alle Tabs, nicht als lokale Fehlermeldung in jede Ansicht. */
+/* Causes that affect every tab (spec section 3): they belong in a banner
+ * above all tabs, not as a local error message in every view. */
 const FATAL_KINDS = ['not-installed', 'daemon-unreachable', 'permission-denied'];
 
 export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {}) {
@@ -56,20 +56,18 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
     const loaderRef = useRef(loader);
     loaderRef.current = loader;
 
-    // Erhoeht sich bei jedem reload()-Aufruf. Ueberholt eine juengere
-    // Anfrage eine aeltere (z. B. `docker ps` unter Last laesst das
-    // 300-ms-Entprellfenster leicht platzen), darf nur die zum Zeitpunkt
-    // ihrer Ankunft noch aktuelle Generation den Zustand schreiben --
-    // sonst ueberschreibt eine spaet ankommende, aeltere Antwort frischere
-    // Daten mit veralteten.
+    // Increases on every reload() call. If a newer request overtakes an
+    // older one (`docker ps` under load easily bursts the 300 ms debounce
+    // window, say), only the generation still current when the response
+    // arrives may write the state -- otherwise a late-arriving older
+    // response overwrites fresher data with stale data.
     const generation = useRef(0);
 
     const visible = opts.tab === undefined || opts.tab === activeTab;
-    // Ereignis-Arrays sind bei jedem Aufrufer-Render ein neues Literal
-    // (`{ events: ['container'] }`); ein Vergleich nach Referenz wuerde das
-    // Abonnement bei jedem Tastendruck ab- und wiederaufbauen. Ein aus dem
-    // Inhalt gebildeter String ist stabil, solange die Ereignistypen
-    // gleich bleiben.
+    // Event arrays are a fresh literal on every render of the caller
+    // (`{ events: ['container'] }`); comparing by reference would tear down
+    // and rebuild the subscription on every keystroke. A string built from
+    // the contents is stable as long as the event types stay the same.
     const eventKey = (opts.events ?? []).join(',');
 
     const reload = useCallback(async () => {
@@ -85,12 +83,11 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
         } catch (err) {
             if (gen !== generation.current)
                 return;
-            // Modulweite Ursachen an den Kontext geben: dort wird ein
-            // einzelnes Banner gezeigt und die Tabs werden deaktiviert.
-            // Frueher landete auch ein toter Daemon als roher Text in jeder
-            // einzelnen Ansicht, sobald er erst nach dem Start eintrat.
-            // not-found und command-failed betreffen nur diesen Ladevorgang
-            // und bleiben lokal.
+            // Hand module-wide causes to the context: it shows a single
+            // banner there and disables the tabs. Previously even a dead
+            // daemon ended up as raw text in every single view as soon as it
+            // occurred after startup. not-found and command-failed concern
+            // only this load and stay local.
             if (isDockerError(err) && FATAL_KINDS.includes(err.kind)) {
                 reportFatal(err);
                 setError(null);
@@ -106,7 +103,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
         }
     }, [reportFatal]);
 
-    // Erstes Laden, sobald der Tab sichtbar und der Zugriff geklaert ist.
+    // First load as soon as the tab is visible and access is established.
     useEffect(() => {
         if (!ready || fatalError)
             return;
@@ -117,7 +114,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
         }
     }, [ready, fatalError, visible, reload]);
 
-    // Ereignisse: sichtbar -> nachladen, unsichtbar -> nur vormerken.
+    // Events: visible -> reload, invisible -> just note it down.
     useEffect(() => {
         if (!ready || fatalError)
             return;
@@ -132,7 +129,7 @@ export function useDockerResource<T>(loader: () => Promise<T>, opts: Options = {
         });
     }, [ready, fatalError, subscribe, reload, activeTab, eventKey, opts.tab]);
 
-    // Sicherheitsnetz gegen einen abgerissenen Ereignisstrom.
+    // Safety net against a torn-off event stream.
     useEffect(() => {
         if (!ready || fatalError || !visible)
             return;

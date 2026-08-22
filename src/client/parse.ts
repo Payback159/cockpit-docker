@@ -17,19 +17,19 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Ausgabe-Parsing fuer Docker-Kommandos.
+/* Output parsing for Docker commands.
  *
- * Dieses Modul importiert bewusst KEIN cockpit: dadurch laufen seine Tests
- * als schlichte Node-Prozesse ohne Mocking-Geruest.
+ * This module deliberately imports NO cockpit: that lets its tests run as
+ * plain Node processes without any mocking scaffolding.
  */
 
 /**
- * Parst eine Listenausgabe von Docker.
+ * Parses a list output from Docker.
  *
- * Docker liefert je nach Kommando ein JSON-Array oder NDJSON (ein Objekt je
- * Zeile), und welches Kommando welches Format liefert, ist ueber die
- * unterstuetzte Versionsspanne nicht zugesichert. Diese Funktion nimmt daher
- * beides an und unterscheidet am ersten Nicht-Leerzeichen.
+ * Depending on the command Docker returns either a JSON array or NDJSON (one
+ * object per line), and which command returns which format is not guaranteed
+ * across the supported version range. This function therefore accepts both and
+ * decides on the first non-whitespace character.
  */
 export function parseJsonList<T>(text: string): T[] {
     const trimmed = text.trim();
@@ -47,21 +47,21 @@ export function parseJsonList<T>(text: string): T[] {
 }
 
 /**
- * Parst eine Ausgabe, die genau ein Objekt enthaelt (etwa `docker info`).
+ * Parses an output that contains exactly one object (`docker info`, say).
  */
 export function parseJson<T>(text: string): T {
     const trimmed = text.trim();
     if (trimmed === '')
-        throw new SyntaxError('Leere Ausgabe, Objekt erwartet');
+        throw new SyntaxError('Empty output, expected an object');
     return JSON.parse(trimmed) as T;
 }
 
 /**
- * Zerlegt den kommagetrennten Label-String, den `docker ps --format json`
- * im Feld `Labels` liefert.
+ * Splits the comma-separated label string that `docker ps --format json`
+ * returns in the `Labels` field.
  *
- * Werte duerfen Gleichheitszeichen enthalten, daher wird nur am ersten
- * getrennt. Eintraege ohne Wert werden uebergangen.
+ * Values may contain equals signs, so we split on the first one only. Entries
+ * without a value are skipped.
  */
 export function parseLabels(labels: string | undefined): Record<string, string> {
     const out: Record<string, string> = {};

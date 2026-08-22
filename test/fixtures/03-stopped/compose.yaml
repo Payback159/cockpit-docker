@@ -1,5 +1,5 @@
-# Wird von load.sh gestartet und sofort wieder gestoppt, damit der
-# Zweig "Status exited / Start-Button statt Stop" abgedeckt ist.
+# Started by load.sh and stopped again right away, so that the branch
+# "status exited / start button instead of stop" is covered.
 services:
   worker:
     image: busybox

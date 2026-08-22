@@ -18,7 +18,7 @@ async function primeAccess() {
     resetMock();
 }
 
-test('listContainers zerlegt die Compose-Labels', async () => {
+test('listContainers splits the compose labels', async () => {
     await primeAccess();
     setSpawnHandler(() => JSON.stringify({
         ID: 'abc',
@@ -35,7 +35,7 @@ test('listContainers zerlegt die Compose-Labels', async () => {
     assert.equal(out[0].Name, 'simple-web-1');
 });
 
-test('listContainers meldet fehlende Labels als unknown', async () => {
+test('listContainers reports missing labels as unknown', async () => {
     await primeAccess();
     setSpawnHandler(() => JSON.stringify({
         ID: 'abc',
@@ -50,7 +50,7 @@ test('listContainers meldet fehlende Labels als unknown', async () => {
     assert.equal(out[0].Project, 'unknown');
 });
 
-test('listContainers filtert auf Compose, wenn verlangt', async () => {
+test('listContainers filters to compose when asked to', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
     await listContainers({ composeOnly: true });
@@ -59,7 +59,7 @@ test('listContainers filtert auf Compose, wenn verlangt', async () => {
     assert.ok(args.includes('label=com.docker.compose.project'));
 });
 
-test('listContainers sortiert nach Projekt, dann Service', async () => {
+test('listContainers sorts by project, then service', async () => {
     await primeAccess();
     const mk = (p: string, s: string) => JSON.stringify({
         ID: p + s,
@@ -75,9 +75,9 @@ test('listContainers sortiert nach Projekt, dann Service', async () => {
     assert.deepEqual(out.map(c => `${c.Project}/${c.Service}`), ['a/x', 'a/y', 'b/z']);
 });
 
-// Der alte Code inspizierte jedes Volume einzeln: bei 152 Volumes waren das
-// 153 Prozesse je Ladevorgang. `docker volume inspect` nimmt mehrere Namen.
-test('listVolumes inspiziert alle Volumes in EINEM Aufruf', async () => {
+// The old code inspected every volume individually: with 152 volumes that was
+// 153 processes per load. `docker volume inspect` takes several names.
+test('listVolumes inspects all volumes in ONE call', async () => {
     await primeAccess();
     setSpawnHandler(call => {
         if (call.args.includes('ls'))
@@ -90,23 +90,23 @@ test('listVolumes inspiziert alle Volumes in EINEM Aufruf', async () => {
     });
     const out = await listVolumes();
     assert.equal(out.length, 3);
-    // ls + genau ein inspect
+    // ls + exactly one inspect
     assert.equal(recordedCalls().length, 2);
     const inspect = recordedCalls()[1].args;
     assert.deepEqual(inspect.slice(-3), ['v1', 'v2', 'v3']);
 });
 
-test('listVolumes liefert bei keinem Volume eine leere Liste ohne inspect', async () => {
+test('listVolumes returns an empty list without an inspect when there are no volumes', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
     assert.deepEqual(await listVolumes(), []);
     assert.equal(recordedCalls().length, 1);
 });
 
-// Die Uebersicht braucht nur die Anzahl. Ueber listVolumes() gezaehlt waere
-// das ls + ein inspect ueber ALLE Volumes, dessen Nutzlast sofort wieder
-// verworfen wird -- und das bei jedem entprellten Ereignis.
-test('countVolumes zaehlt mit genau EINEM Aufruf und ohne inspect', async () => {
+// The overview only needs the count. Counting through listVolumes() would be
+// ls + an inspect over ALL volumes whose payload is discarded right away -- on
+// every debounced event.
+test('countVolumes counts with exactly ONE call and no inspect', async () => {
     await primeAccess();
     setSpawnHandler(() => 'v1\nv2\nv3\n');
     assert.equal(await countVolumes(), 3);
@@ -114,14 +114,14 @@ test('countVolumes zaehlt mit genau EINEM Aufruf und ohne inspect', async () => 
     assert.deepEqual(recordedCalls()[0].args, ['docker', 'volume', 'ls', '-q']);
 });
 
-test('countVolumes liefert bei leerer Ausgabe 0', async () => {
+test('countVolumes returns 0 for empty output', async () => {
     await primeAccess();
     setSpawnHandler(() => '\n  \n');
     assert.equal(await countVolumes(), 0);
     assert.equal(recordedCalls().length, 1);
 });
 
-test('removeVolume haengt -f nur bei force an', async () => {
+test('removeVolume appends -f only when force is set', async () => {
     await primeAccess();
     setSpawnHandler(() => '');
     await removeVolume('v1');
@@ -132,9 +132,9 @@ test('removeVolume haengt -f nur bei force an', async () => {
     assert.ok(recordedCalls()[0].args.includes('-f'));
 });
 
-// Die alte pruneVolumes hing in BEIDEN Zweigen ein Force-Flag an, sodass der
-// Parameter wirkungslos war.
-test('pruneVolumes laeuft immer nicht-interaktiv, aber ohne zweites Flag', async () => {
+// The old pruneVolumes appended a force flag in BOTH branches, which made the
+// parameter meaningless.
+test('pruneVolumes always runs non-interactively, but without a second flag', async () => {
     await primeAccess();
     setSpawnHandler(() => 'Total reclaimed space: 0B');
     await pruneVolumes();
@@ -142,7 +142,7 @@ test('pruneVolumes laeuft immer nicht-interaktiv, aber ohne zweites Flag', async
     assert.deepEqual(args, ['docker', 'volume', 'prune', '--force']);
 });
 
-test('listImages markiert von Compose genutzte Images', async () => {
+test('listImages marks images used by compose', async () => {
     await primeAccess();
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
@@ -168,9 +168,9 @@ test('listImages markiert von Compose genutzte Images', async () => {
     assert.deepEqual(out[0].ComposeProjects, ['simple']);
 });
 
-test('listImages ordnet ein Image ohne expliziten Tag zu', async () => {
+test('listImages maps an image without an explicit tag', async () => {
     await primeAccess();
-    // Compose-Datei sagt `image: busybox`, docker images meldet Tag latest.
+    // The compose file says `image: busybox`, docker images reports tag latest.
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
             return JSON.stringify({
@@ -195,7 +195,7 @@ test('listImages ordnet ein Image ohne expliziten Tag zu', async () => {
     assert.deepEqual(out[0].ComposeProjects, ['simple']);
 });
 
-test('listImages laesst ein Image mit Tag <none> unzugeordnet', async () => {
+test('listImages leaves an image tagged <none> unmapped', async () => {
     await primeAccess();
     setSpawnHandler(call => {
         if (call.args[1] === 'images')
@@ -221,7 +221,7 @@ test('listImages laesst ein Image mit Tag <none> unzugeordnet', async () => {
     assert.deepEqual(out[0].ComposeProjects, []);
 });
 
-test('listImages ordnet eine Digest-Referenz bewusst NICHT zu (bekannte Grenze)', async () => {
+test('listImages deliberately does NOT map a digest reference (known limitation)', async () => {
     await primeAccess();
     setSpawnHandler(call => {
         if (call.args[1] === 'images')

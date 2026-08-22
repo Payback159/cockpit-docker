@@ -17,11 +17,11 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Compose-Projekte und ihre Services.
+/* Compose projects and their services.
  *
- * Projekte werden ausschliesslich ueber --project-name angesprochen. Das
- * Feld ConfigFiles aus `compose ls` kann mehrere kommagetrennte Pfade
- * enthalten und ist als -f-Argument dann ungueltig; es dient nur der Anzeige.
+ * Projects are addressed exclusively through --project-name. The ConfigFiles
+ * field from `compose ls` may contain several comma-separated paths and is
+ * then invalid as a -f argument; it serves display purposes only.
  */
 import cockpit from 'cockpit';
 
@@ -39,13 +39,13 @@ export async function listProjects(): Promise<ComposeProject[]> {
 }
 
 /**
- * Services eines Projekts. Ein unbekanntes Projekt liefert eine leere Liste,
- * keinen Fehler -- Docker beendet sich in diesem Fall mit exit 0.
+ * Services of a project. An unknown project returns an empty list, not an
+ * error -- Docker exits with status 0 in that case.
  *
- * Die Funktion gehoert zur Schnittstelle, die die Spec fuer compose.ts
- * vorsieht, auch wenn die Oberflaeche sie derzeit nicht aufruft; ihr Test
- * sichert das NDJSON-Verhalten ab, an dem die frueherer Implementierung ab
- * dem zweiten Service scheiterte.
+ * The function is part of the interface the spec lays out for compose.ts, even
+ * though the UI does not currently call it; its test pins down the NDJSON
+ * behaviour that the earlier implementation failed on from the second service
+ * onwards.
  */
 export async function listServices(project: string): Promise<ComposeService[]> {
     const out = await run(projectArgs(project, 'ps', '--format', 'json', '--all'));
@@ -57,17 +57,17 @@ export async function upProject(project: string): Promise<void> {
 }
 
 /**
- * Startet die Container eines bereits vorhandenen Projekts neu, ohne das
- * Projektmodell aus einer Compose-Datei zu rekonstruieren. `start` arbeitet
- * -- wie stop/restart/down/ps -- ausschliesslich ueber Container-Labels und
- * kommt daher ohne -f aus.
+ * Starts the containers of an already existing project again, without
+ * reconstructing the project model from a compose file. `start` works -- like
+ * stop/restart/down/ps -- exclusively through container labels and therefore
+ * needs no -f.
  *
- * `upProject` (docker compose up -d) waere hier die falsche Wahl: es
- * benoetigt zwingend die Compose-Datei(en) und schlaegt ohne -f mit
- * "no configuration file provided: not found" fehl, weil run() ohne
- * Arbeitsverzeichnis laeuft. upProject bleibt Teil der Schnittstelle fuer
- * einen Create-from-file-Ablauf; diese Oberflaeche kennt nur bereits
- * bestehende Projekte, fuer die start() genuegt.
+ * `upProject` (docker compose up -d) would be the wrong choice here: it
+ * strictly requires the compose file(s) and fails without -f with
+ * "no configuration file provided: not found", because run() runs without a
+ * working directory. upProject stays part of the interface for a
+ * create-from-file flow; this UI only knows about projects that already
+ * exist, for which start() is enough.
  */
 export async function startProject(project: string): Promise<void> {
     await run(projectArgs(project, 'start'));
@@ -86,13 +86,13 @@ export async function restartProject(project: string): Promise<void> {
 }
 
 /**
- * Liest eine Compose-Datei. Erwartet EINEN Pfad -- Aufrufer, die ein
- * ConfigFiles-Feld haben, muessen es vorher an Kommas zerlegen.
+ * Reads a compose file. Expects ONE path -- callers holding a ConfigFiles
+ * field must split it on commas first.
  *
- * Der Zugriffsmodus gilt auch hier: laeuft der Docker-Zugriff ueber
- * Rechteerhoehung, liegen die Projektverzeichnisse in aller Regel unter root.
- * Ohne `superuser` scheiterte allein diese Leseoperation, waehrend jede
- * andere Operation des Moduls funktioniert.
+ * The access mode applies here too: if Docker access runs through privilege
+ * escalation, the project directories almost always belong to root. Without
+ * `superuser` this read operation alone would fail while every other
+ * operation of the module works.
  */
 export async function readComposeFile(path: string): Promise<string> {
     const options = getAccessMode() === 'require'

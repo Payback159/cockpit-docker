@@ -17,16 +17,16 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Ausfuehrung von Docker-Kommandos ueber cockpit.
+/* Execution of Docker commands through cockpit.
  *
- * Dies ist das EINZIGE Modul, das cockpit.spawn aufruft. Fachliche Module
- * gehen ueber run() bzw. stream().
+ * This is the ONLY module that calls cockpit.spawn. Domain modules go through
+ * run() and stream().
  *
- * Zum Zugriffsmodell: Der Zugriff auf /var/run/docker.sock haengt an der
- * Gruppe docker, nicht an sudo. Ein pauschales superuser: "require" waere
- * daher schaedlich -- es forderte Admin-Rechte an, wo keine noetig sind, und
- * scheiterte bei Nutzern ohne sudo, obwohl Docker erreichbar ist. Deshalb
- * wird der Modus einmal ermittelt und danach fuer alle Aufrufe verwendet.
+ * On the access model: access to /var/run/docker.sock hangs on the docker
+ * group, not on sudo. A blanket superuser: "require" would therefore be
+ * harmful -- it would ask for admin rights where none are needed, and would
+ * fail for users without sudo even though Docker is reachable. So the mode is
+ * determined once and then used for every call.
  */
 import cockpit from 'cockpit';
 
@@ -36,25 +36,25 @@ export type AccessMode = 'none' | 'require';
 
 let accessMode: AccessMode | null = null;
 
-/* Quelle fuer "Admin-Zugriff ist verfuegbar".
+/* Source for "admin access is available".
  *
- * Bewusst ein Setter statt eines Imports von 'superuser': dieses Modul soll
- * ohne die cockpit-Seitenumgebung testbar bleiben (die Unit-Tests aliasen nur
- * 'cockpit'), und der Provider ist ohnehin die Stelle, die den Wert
- * beobachtet. Wichtig ist, dass hier eine FUNKTION hinterlegt wird und kein
- * Wert: `superuser.allowed` ist waehrend der Sitzungsinitialisierung `null`
- * und wird erst spaeter `true`/`false` (siehe pkg/lib/superuser.js). Ein
- * einmal kopierter Wert waere daher fast immer `null` -- gelesen wird deshalb
- * erst im Moment der Eskalation. */
+ * Deliberately a setter rather than an import of 'superuser': this module is
+ * meant to stay testable without the cockpit page environment (the unit tests
+ * only alias 'cockpit'), and the provider is the place that watches the value
+ * anyway. What matters is that a FUNCTION is stored here and not a value:
+ * `superuser.allowed` is `null` during session initialisation and only later
+ * becomes `true`/`false` (see pkg/lib/superuser.js). A value copied once would
+ * therefore almost always be `null` -- which is why it is read at the moment
+ * of escalation instead. */
 let superuserAllowedSource: () => boolean = () => false;
 
 export function setSuperuserAllowedSource(fn: () => boolean): void {
     superuserAllowedSource = fn;
 }
 
-/* Laufende Probe, damit gleichzeitige Aufrufer (Provider-Start, run()s
- * Selbstprobe nach resetAccessMode()) nicht mehrere `docker info` starten und
- * sich gegenseitig den Modus ueberschreiben. */
+/* Probe in flight, so that concurrent callers (provider startup, run()'s own
+ * probe after resetAccessMode()) do not start several `docker info` runs and
+ * overwrite each other's mode. */
 let inFlightProbe: Promise<AccessMode> | null = null;
 
 export function getAccessMode(): AccessMode | null {
@@ -91,11 +91,10 @@ function invoke(args: string[], mode: AccessMode, environ?: string[]): Promise<s
 }
 
 /**
- * Ermittelt den Zugriffsmodus und merkt ihn.
+ * Determines the access mode and remembers it.
  *
- * Erst ohne Rechteerhoehung; schlaegt das fehl und ist Admin-Zugriff
- * verfuegbar, ein zweiter Versuch mit superuser. Schlagen beide fehl, wird
- * der klassifizierte Fehler geworfen.
+ * First without escalation; if that fails and admin access is available, a
+ * second attempt with superuser. If both fail, the classified error is thrown.
  */
 export function probeAccess(
     opts: { superuserAllowed?: boolean } = {}
@@ -105,9 +104,9 @@ export function probeAccess(
 
     const running = doProbe(opts);
     inFlightProbe = running;
-    // Nicht .finally() an das zurueckgegebene Promise haengen: dessen
-    // Ablehnung muesste sonst zusaetzlich behandelt werden. Der Aufraeumer
-    // haengt am Original und laesst die Ablehnung unveraendert weiterlaufen.
+    // Do not hang .finally() on the returned promise: its rejection would
+    // then need handling on top. The cleanup hangs on the original and lets
+    // the rejection propagate unchanged.
     running.then(
         () => { if (inFlightProbe === running) inFlightProbe = null; },
         () => { if (inFlightProbe === running) inFlightProbe = null; });
@@ -124,12 +123,12 @@ async function doProbe(opts: { superuserAllowed?: boolean }): Promise<AccessMode
     } catch (err) {
         const first = toDockerError(err);
 
-        // Fehlendes Binary oder toter Daemon werden durch Rechteerhoehung
-        // nicht besser.
+        // A missing binary or a dead daemon does not get better with
+        // escalated privileges.
         if (first.kind === 'not-installed' || first.kind === 'daemon-unreachable')
             throw first;
-        // Erst JETZT lesen: zum Zeitpunkt des Aufrufs kann die
-        // cockpit-Sitzung den Admin-Zugriff noch gar nicht kennen.
+        // Read only NOW: at call time the cockpit session may not know
+        // about admin access yet.
         const allowed = opts.superuserAllowed ?? superuserAllowedSource();
         if (!allowed)
             throw first;
@@ -145,8 +144,8 @@ async function doProbe(opts: { superuserAllowed?: boolean }): Promise<AccessMode
 }
 
 /**
- * Fuehrt ein Kommando aus und liefert dessen Ausgabe.
- * Wirft bei Fehlern einen DockerError.
+ * Runs a command and returns its output.
+ * Throws a DockerError on failure.
  */
 export async function run(
     args: string[],
@@ -163,8 +162,8 @@ export async function run(
 }
 
 /**
- * Startet ein Kommando als Stream (fuer `docker logs -f` und `docker events`).
- * Der Aufrufer beendet ihn ueber close().
+ * Starts a command as a stream (for `docker logs -f` and `docker events`).
+ * The caller ends it through close().
  */
 export function stream(
     args: string[],
@@ -188,7 +187,7 @@ export function stream(
             try {
                 proc.close();
             } catch {
-                /* bereits beendet */
+                /* already ended */
             }
         },
     };

@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-/* Baut die *.test.ts unter src/ zu eigenstaendigen ESM-Dateien in dist-test/,
- * damit `node --test` sie ohne TypeScript-Laufzeit ausfuehren kann.
+/* Builds the *.test.ts files under src/ into standalone ESM files in
+ * dist-test/, so that `node --test` can run them without a TypeScript runtime.
  *
- * Jede Testdatei wird gebuendelt (bundle: true), damit relative Importe und
- * Dateiendungen keine Rolle spielen. Der Alias biegt Importe von 'cockpit' auf
- * ein Test-Double um; Module, die cockpit gar nicht importieren, sind davon
- * nicht betroffen.
+ * Every test file is bundled (bundle: true) so that relative imports and file
+ * extensions do not matter. The alias redirects imports of 'cockpit' to a test
+ * double; modules that do not import cockpit at all are unaffected.
  */
 import { build } from 'esbuild';
 import { globSync } from 'glob';
@@ -13,7 +12,7 @@ import { globSync } from 'glob';
 const entryPoints = globSync('src/**/*.test.ts');
 
 if (entryPoints.length === 0) {
-    console.error('Keine Testdateien gefunden (src/**/*.test.ts)');
+    console.error('No test files found (src/**/*.test.ts)');
     process.exit(1);
 }
 
@@ -31,4 +30,4 @@ await build({
     },
 });
 
-console.log(`${entryPoints.length} Testdatei(en) nach dist-test/ gebaut`);
+console.log(`Built ${entryPoints.length} test file(s) into dist-test/`);

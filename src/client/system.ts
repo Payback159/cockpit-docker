@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Erkennung von Docker und Compose sowie Systemkennzahlen. */
+/* Detection of Docker and Compose, plus system metrics. */
 import { run } from './spawn';
 import { parseJson } from './parse';
 import { isDockerError } from './errors';
@@ -42,12 +42,12 @@ export async function checkDocker(): Promise<DockerInfo> {
 }
 
 /**
- * Sucht Compose. Nur v2 (Plugin) gilt als nutzbar.
+ * Looks for Compose. Only v2 (the plugin) counts as usable.
  *
- * Wird stattdessen das alte `docker-compose` (v1, Python) gefunden, wird das
- * ausdruecklich vermerkt: v1 kennt kein `docker compose ls`, auf dem die
- * Projektliste aufbaut. Es als installiert zu melden wuerde bedeuten, dass
- * das Modul Compose meldet und danach bei jeder Operation scheitert.
+ * If the old `docker-compose` (v1, Python) is found instead, that is recorded
+ * explicitly: v1 has no `docker compose ls`, which the project list is built
+ * on. Reporting it as installed would mean the module announces Compose and
+ * then fails on every operation.
  */
 export async function checkCompose(): Promise<ComposeInfo> {
     try {

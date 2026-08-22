@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Gemeinsame Datentypen der Client-Schicht. */
+/* Shared data types of the client layer. */
 import type { DockerErrorKind } from './errors';
 
 export interface DockerInfo {
@@ -31,8 +31,8 @@ export interface ComposeInfo {
     installed: boolean;
     version?: string;
     isPlugin: boolean;
-    /* Compose v1 (Python) wurde gefunden. v1 kennt kein `compose ls`,
-     * daher gilt es als nicht nutzbar. */
+    /* Compose v1 (Python) was found. v1 has no `compose ls`, so it does not
+     * count as usable. */
     isLegacyV1: boolean;
     kind?: DockerErrorKind | undefined;
     error?: string;
@@ -63,8 +63,8 @@ export interface DockerSystemInfo {
 export interface ComposeProject {
     Name: string;
     Status: string;
-    /* Kann MEHRERE kommagetrennte Pfade enthalten. Nur zur Anzeige
-     * verwenden, nie als -f-Argument. */
+    /* May contain MULTIPLE comma-separated paths. Use for display only,
+     * never as a -f argument. */
     ConfigFiles: string;
 }
 

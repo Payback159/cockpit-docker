@@ -72,11 +72,11 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                 const fileContent = await readComposeFile(configPath);
                 setContent(fileContent);
 
-                // Highlighting ist rein kosmetisch und darf ein erfolgreich
-                // gelesenes File nicht als Fehler melden. Ein eigener
-                // try/catch haelt einen hljs-Absturz vom Lesefehlerpfad fern
-                // -- schlaegt es fehl, bleibt highlightedCode leer und die
-                // Anzeige faellt auf den Klartext-Zweig unten zurueck.
+                // Highlighting is purely cosmetic and must not report a
+                // successfully read file as an error. A try/catch of its own
+                // keeps an hljs crash away from the read-error path -- if it
+                // fails, highlightedCode stays empty and the display falls
+                // back to the plain-text branch below.
                 try {
                     const highlighted = hljs.highlight(fileContent, { language: 'yaml' }).value;
                     setHighlightedCode(highlighted);
@@ -84,9 +84,10 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                     setHighlightedCode('');
                 }
             } catch (err) {
-                // readComposeFile() gibt weiter, was cockpit.file().read()
-                // ablehnt -- ein BasicError des Kanals, kein DockerError.
-                // Er ist keine Error-Instanz, traegt aber ein .message-Feld.
+                // readComposeFile() passes on whatever cockpit.file().read()
+                // rejects with -- a BasicError of the channel, not a
+                // DockerError. It is not an Error instance, but does carry a
+                // .message field.
                 const message = err instanceof Error
                     ? err.message
                     : (err !== null && typeof err === 'object' && 'message' in err
@@ -126,7 +127,7 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
             onClose={handleClose}
             width="85%"
         >
-            {/* Header mit Dateipfad */}
+            {/* Header with the file path */}
             <div
                 style={{
                     display: 'flex',
@@ -185,7 +186,7 @@ export const ComposeFileViewer: React.FC<ComposeFileViewerProps> = ({
                 </div>
             )}
 
-            {/* Footer mit Buttons */}
+            {/* Footer with buttons */}
             <div
                 style={{
                     display: 'flex',

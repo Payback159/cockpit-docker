@@ -10,7 +10,7 @@ beforeEach(() => {
     resetAccessMode();
 });
 
-test('checkDocker liest die Version', async () => {
+test('checkDocker reads the version', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info')
             return '{}';
@@ -21,7 +21,7 @@ test('checkDocker liest die Version', async () => {
     assert.equal(info.version, '29.1.3');
 });
 
-test('checkDocker meldet ein fehlendes Binary', async () => {
+test('checkDocker reports a missing binary', async () => {
     setSpawnHandler(() => {
         throw new FakeProcessError('not found', 'not-found', null);
     });
@@ -30,7 +30,7 @@ test('checkDocker meldet ein fehlendes Binary', async () => {
     assert.equal(info.kind, 'not-installed');
 });
 
-test('checkCompose erkennt das v2-Plugin', async () => {
+test('checkCompose recognises the v2 plugin', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info')
             return '{}';
@@ -42,10 +42,10 @@ test('checkCompose erkennt das v2-Plugin', async () => {
     assert.equal(info.isPlugin, true);
 });
 
-// Compose v1 kennt kein `docker compose ls`, auf dem listComposeProjects
-// aufbaut. Es als "installiert" zu melden waere irrefuehrend: jede
-// Folgeoperation scheitert.
-test('checkCompose lehnt v1 ausdruecklich ab statt es als installiert zu melden', async () => {
+// Compose v1 has no `docker compose ls`, which listComposeProjects is built
+// on. Reporting it as "installed" would be misleading: every subsequent
+// operation fails.
+test('checkCompose rejects v1 explicitly instead of reporting it as installed', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info')
             return '{}';
@@ -59,7 +59,7 @@ test('checkCompose lehnt v1 ausdruecklich ab statt es als installiert zu melden'
     assert.equal(info.isLegacyV1, true);
 });
 
-test('checkCompose meldet fehlendes Compose', async () => {
+test('checkCompose reports missing Compose', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info')
             return '{}';
@@ -70,7 +70,7 @@ test('checkCompose meldet fehlendes Compose', async () => {
     assert.equal(info.isLegacyV1, false);
 });
 
-test('getInfo parst die Kennzahlen', async () => {
+test('getInfo parses the metrics', async () => {
     setSpawnHandler(() => JSON.stringify({
         Containers: 11,
         ContainersRunning: 10,
@@ -86,7 +86,7 @@ test('getInfo parst die Kennzahlen', async () => {
     assert.equal(info.Driver, 'overlayfs');
 });
 
-test('getInfo wirft statt einen leeren Wert zu liefern', async () => {
+test('getInfo throws instead of returning an empty value', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info' && call.args.length === 2)
             return '{}';

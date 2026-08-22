@@ -84,19 +84,18 @@ export const ComposeImages: React.FC = () => {
         }
 
         setIsCleaning(true);
-        // Jedes Image einzeln versuchen: ein einzelner haengender Container
-        // (docker rmi schlaegt fehl, solange irgendein Container das Image
-        // noch referenziert) darf nicht den ganzen Aufraeumlauf abbrechen --
-        // die uebrigen Images sind davon unabhaengig entfernbar. Erst nach
-        // dem vollstaendigen Durchlauf wird neu geladen und ein
-        // gesammelter Fehler gemeldet, falls welche uebrig blieben.
+        // Try every image individually: a single lingering container (docker
+        // rmi fails while any container still references the image) must not
+        // abort the whole cleanup run -- the remaining images can be removed
+        // independently of it. Only after the full pass do we reload and
+        // report a collected error if any were left over.
         const failed: string[] = [];
         for (const image of unusedImages) {
             try {
                 await removeImage(image.ID);
             } catch (err) {
                 failed.push(image.ID);
-                console.warn('Image konnte nicht entfernt werden:', image.ID, err);
+                console.warn('Could not remove image:', image.ID, err);
             }
         }
         await reload();

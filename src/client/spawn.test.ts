@@ -14,9 +14,9 @@ beforeEach(() => {
     setSuperuserAllowedSource(() => false);
 });
 
-// Lage 1: Nutzer ist in der Gruppe docker. Der Zugriff gelingt ohne
-// Rechteerhoehung, es darf kein Admin-Prompt ausgeloest werden.
-test('gelingt der Zugriff ohne Rechteerhoehung, ist der Modus none', async () => {
+// Situation 1: user is in the docker group. Access succeeds without
+// escalation, and no admin prompt must be triggered.
+test('when access succeeds without escalation, the mode is none', async () => {
     setSpawnHandler(() => '{}');
     const mode = await probeAccess();
     assert.equal(mode, 'none');
@@ -25,8 +25,8 @@ test('gelingt der Zugriff ohne Rechteerhoehung, ist der Modus none', async () =>
     assert.equal(recordedCalls()[0].superuser, null);
 });
 
-// Lage 2: Nutzer ist Administrator, aber nicht in der Gruppe docker.
-test('scheitert der erste Versuch, wird mit superuser wiederholt', async () => {
+// Situation 2: user is an administrator, but not in the docker group.
+test('when the first attempt fails, it is retried with superuser', async () => {
     setSpawnHandler(call => {
         if (call.superuser === 'require')
             return '{}';
@@ -38,8 +38,8 @@ test('scheitert der erste Versuch, wird mit superuser wiederholt', async () => {
     assert.equal(recordedCalls()[1].superuser, 'require');
 });
 
-// Lage 3: weder Gruppe noch Admin-Zugriff.
-test('scheitern beide Wege, wirft die Probe einen klassifizierten Fehler', async () => {
+// Situation 3: neither group membership nor admin access.
+test('when both paths fail, the probe throws a classified error', async () => {
     setSpawnHandler(() => {
         throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
     });
@@ -48,7 +48,7 @@ test('scheitern beide Wege, wirft die Probe einen klassifizierten Fehler', async
         (e: unknown) => (e as { kind?: string }).kind === 'permission-denied');
 });
 
-test('ohne Admin-Zugriff wird gar nicht erst eskaliert', async () => {
+test('without admin access no escalation is attempted at all', async () => {
     setSpawnHandler(() => {
         throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
     });
@@ -56,7 +56,7 @@ test('ohne Admin-Zugriff wird gar nicht erst eskaliert', async () => {
     assert.equal(recordedCalls().length, 1);
 });
 
-test('fehlendes Binary wird als not-installed gemeldet', async () => {
+test('a missing binary is reported as not-installed', async () => {
     setSpawnHandler(() => {
         throw new FakeProcessError('not found', 'not-found', null);
     });
@@ -65,7 +65,7 @@ test('fehlendes Binary wird als not-installed gemeldet', async () => {
         (e: unknown) => (e as { kind?: string }).kind === 'not-installed');
 });
 
-test('run verwendet den ermittelten Modus fuer Folgeaufrufe', async () => {
+test('run uses the determined mode for subsequent calls', async () => {
     setSpawnHandler(call => {
         if (call.args[1] === 'info' && call.superuser !== 'require')
             throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
@@ -78,7 +78,7 @@ test('run verwendet den ermittelten Modus fuer Folgeaufrufe', async () => {
     assert.equal(recordedCalls()[0].superuser, 'require');
 });
 
-test('run reicht environ durch', async () => {
+test('run passes environ through', async () => {
     setSpawnHandler(() => 'ok');
     await probeAccess();
     resetMock();
@@ -87,7 +87,7 @@ test('run reicht environ durch', async () => {
     assert.deepEqual(recordedCalls()[0].environ, ['A=1']);
 });
 
-test('run wandelt einen Fehler in einen DockerError um', async () => {
+test('run converts a failure into a DockerError', async () => {
     setSpawnHandler(() => 'ok');
     await probeAccess();
     setSpawnHandler(() => {
@@ -98,23 +98,23 @@ test('run wandelt einen Fehler in einen DockerError um', async () => {
         (e: unknown) => (e as { kind?: string }).kind === 'not-found');
 });
 
-test('run ohne vorherige Probe fuehrt sie selbst aus', async () => {
+test('run without a prior probe runs one itself', async () => {
     setSpawnHandler(() => 'ok');
     await run(['docker', 'ps']);
     assert.equal(getAccessMode(), 'none');
 });
 
-// Ohne eigenes superuserAllowed muss die Probe die hinterlegte Quelle
-// befragen -- und zwar erst im Moment der Eskalation. Beim Seitenaufbau ist
-// superuser.allowed zunaechst null und wird erst danach true; ein beim Aufruf
-// abgelesener Wert liesse die Eskalation nie zustande kommen.
-test('ohne Argument fragt die Probe die hinterlegte Quelle -- erst bei der Eskalation', async () => {
+// Without its own superuserAllowed the probe must consult the configured
+// source -- and only at the moment of escalation. While the page is loading,
+// superuser.allowed is null at first and only becomes true afterwards; a value
+// read at call time would never let the escalation happen.
+test('without an argument the probe consults the configured source -- only on escalation', async () => {
     let allowed = false;
     setSuperuserAllowedSource(() => allowed);
     setSpawnHandler(call => {
         if (call.superuser === 'require')
             return '{}';
-        // Zwischen Aufruf und Eskalation wird der Admin-Zugriff bekannt.
+        // Between the call and the escalation, admin access becomes known.
         allowed = true;
         throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
     });
@@ -122,7 +122,7 @@ test('ohne Argument fragt die Probe die hinterlegte Quelle -- erst bei der Eskal
     assert.equal(recordedCalls().length, 2);
 });
 
-test('meldet die Quelle keinen Admin-Zugriff, wird nicht eskaliert', async () => {
+test('when the source reports no admin access, nothing is escalated', async () => {
     setSuperuserAllowedSource(() => false);
     setSpawnHandler(() => {
         throw new FakeProcessError('permission denied while trying to connect to the docker API', null, 1);
@@ -131,10 +131,10 @@ test('meldet die Quelle keinen Admin-Zugriff, wird nicht eskaliert', async () =>
     assert.equal(recordedCalls().length, 1);
 });
 
-// run() darf waehrend einer laufenden Probe (etwa nach resetAccessMode())
-// keine zweite starten: beide wuerden den Modus setzen, und die spaetere
-// koennte den bereits eskalierten Modus wieder auf 'none' zuruecknehmen.
-test('gleichzeitige Proben teilen sich einen Lauf', async () => {
+// run() must not start a second probe while one is in flight (after
+// resetAccessMode(), say): both would set the mode, and the later one could
+// take the already escalated mode back down to 'none'.
+test('concurrent probes share a single run', async () => {
     setSuperuserAllowedSource(() => true);
     setSpawnHandler(call => {
         if (call.superuser === 'require')
@@ -145,14 +145,14 @@ test('gleichzeitige Proben teilen sich einen Lauf', async () => {
     assert.equal(a, 'require');
     assert.equal(b, 'require');
     assert.equal(c, '{}');
-    // genau eine Probe (2 Aufrufe) plus das eigentliche `docker ps`
+    // exactly one probe (2 calls) plus the actual `docker ps`
     assert.equal(recordedCalls().length, 3);
     assert.equal(getAccessMode(), 'require');
 });
 
-// Nach Abschluss darf die naechste Probe wieder wirklich laufen (sonst
-// bliebe ein einmal ermitteltes Ergebnis fuer immer stehen).
-test('nach Abschluss ist die Probe wieder ausfuehrbar', async () => {
+// Once finished, the next probe must really run again (otherwise a result
+// determined once would stand forever).
+test('after completion the probe can run again', async () => {
     setSpawnHandler(() => '{}');
     await probeAccess();
     resetAccessMode();

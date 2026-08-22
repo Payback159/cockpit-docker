@@ -17,10 +17,10 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Modulweite Fehlermeldung.
+/* Module-wide error message.
  *
- * not-installed, daemon-unreachable und permission-denied betreffen jeden
- * Tab; sie werden daher einmal oben angezeigt statt in jeder Ansicht.
+ * not-installed, daemon-unreachable and permission-denied affect every tab, so
+ * they are shown once at the top rather than in every view.
  */
 import React from 'react';
 import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";

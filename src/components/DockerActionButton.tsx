@@ -17,21 +17,21 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Schaltflaeche fuer schreibende Docker-Aktionen.
+/* Button for Docker actions that write.
  *
- * Laeuft der Zugriff ueber Rechteerhoehung (Modus 'require') und ist der
- * Admin-Zugriff gerade nicht aktiv, wuerde die Aktion ins Leere laufen. In
- * diesem Fall wird sie deaktiviert und der Grund als Tooltip erklaert.
+ * If access runs through privilege escalation (mode 'require') and admin
+ * access is not currently active, the action would go nowhere. In that case it
+ * is disabled and the reason is explained in a tooltip.
  *
- * PrivilegedButton aus pkg/lib waere hier zu grobkoernig: es nimmt weder
- * `size` noch `icon` noch ein eigenes `isDisabled` an und hardcodiert
- * `isInline`. Stattdessen wird der niedrigere Baustein `Privileged` um eine
- * eigene <Button> gelegt -- so bleiben alle Props erhalten, und ein
- * zusaetzliches isDisabled (z. B. waehrend eine andere Aktion laeuft) wird
- * mit der fehlenden Berechtigung UND-verknuepft statt von ihr verdeckt.
+ * PrivilegedButton from pkg/lib would be too coarse-grained here: it accepts
+ * neither `size` nor `icon` nor an `isDisabled` of its own, and hardcodes
+ * `isInline`. Instead the lower-level building block `Privileged` is wrapped
+ * around a <Button> of our own -- that way all props survive, and an
+ * additional isDisabled (while another action is running, say) is ANDed with
+ * the missing permission instead of being masked by it.
  *
- * Im Modus 'none' (Nutzer ist in der Gruppe docker) braucht es keine
- * Rechteerhoehung; dann ist es eine gewoehnliche Schaltflaeche.
+ * In mode 'none' (user is in the docker group) no escalation is needed; then
+ * it is an ordinary button.
  */
 import React, { useId } from 'react';
 import { Button, type ButtonProps } from "@patternfly/react-core/dist/esm/components/Button/index.js";
@@ -51,10 +51,10 @@ interface Props {
     icon?: React.ReactNode;
     isDisabled?: boolean;
     ariaLabel?: string;
-    /* Eindeutige Tooltip-Id fuer die Privileged-Huelle. `Privileged` baut
-     * daraus "<tooltipId>_tooltip"; ohne eigene Id waere das bei jeder
-     * Instanz "undefined_tooltip" -- doppelte DOM-Ids. Ohne Vorgabe wird
-     * eine pro Instanz eindeutige Id erzeugt. */
+    /* Unique tooltip id for the Privileged wrapper. `Privileged` builds
+     * "<tooltipId>_tooltip" from it; without an id of our own that would be
+     * "undefined_tooltip" on every instance -- duplicate DOM ids. When none
+     * is given, an id unique per instance is generated. */
     tooltipId?: string;
     children: React.ReactNode;
 }
@@ -65,9 +65,9 @@ export const DockerActionButton: React.FC<Props> = ({
     const { mode } = useDockerContext();
     const user = useLoggedInUser();
     const generatedTooltipId = useId();
-    // superuser.allowed wird direkt gelesen, nicht ueber React-State --
-    // ohne dieses Abonnement wuerde ein Wechsel der Rechteerhoehung erst
-    // bei einem unabhaengigen Re-Render sichtbar (wie in PrivilegedButton).
+    // superuser.allowed is read directly, not through React state -- without
+    // this subscription a change in privilege escalation would only become
+    // visible on an unrelated re-render (as in PrivilegedButton).
     useEvent(superuser, 'changed');
 
     if (mode !== 'require') {

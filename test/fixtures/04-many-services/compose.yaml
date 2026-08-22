@@ -1,6 +1,6 @@
-# Fuenf Services: erzwingt mehrzeiliges NDJSON bei
-# "docker compose ps --format json". Ein JSON.parse ueber die Gesamtausgabe
-# scheitert ab dem zweiten Service.
+# Five services: forces multi-line NDJSON from
+# "docker compose ps --format json". A JSON.parse over the whole output fails
+# from the second service onwards.
 services:
   one:
     image: busybox

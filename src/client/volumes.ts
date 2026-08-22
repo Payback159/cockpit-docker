@@ -17,17 +17,17 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Volumes: auflisten, entfernen, aufraeumen. */
+/* Volumes: list, remove, prune. */
 import { run } from './spawn';
 import { parseJsonList } from './parse';
 import type { DockerVolume } from './types';
 
 /**
- * Listet alle Volumes mit Details.
+ * Lists all volumes with details.
  *
- * `docker volume inspect` nimmt mehrere Namen in EINEM Aufruf. Der frueher
- * verwendete Aufruf je Volume kostete auf einem System mit 152 Volumes 153
- * Prozesse pro Ladevorgang.
+ * `docker volume inspect` takes several names in ONE call. The previously used
+ * one-call-per-volume approach cost 153 processes per load on a system with
+ * 152 volumes.
  */
 export async function listVolumes(): Promise<DockerVolume[]> {
     const names = (await run(['docker', 'volume', 'ls', '--format', '{{.Name}}']))
@@ -50,12 +50,11 @@ export async function listVolumes(): Promise<DockerVolume[]> {
 }
 
 /**
- * Zaehlt Volumes, ohne sie zu inspizieren.
+ * Counts volumes without inspecting them.
  *
- * Die Uebersicht braucht nur die Anzahl. `listVolumes()` dafuer zu verwenden
- * hiesse, jedes Volume zu inspizieren und die vollstaendige Nutzlast wieder
- * wegzuwerfen -- und das bei jedem entprellten Ereignis. Gegenstueck zu
- * countNetworks() in system.ts.
+ * The overview only needs the count. Using `listVolumes()` for it would mean
+ * inspecting every volume and throwing the full payload away again -- on every
+ * debounced event. Counterpart to countNetworks() in system.ts.
  */
 export async function countVolumes(): Promise<number> {
     const out = await run(['docker', 'volume', 'ls', '-q']);
@@ -72,10 +71,10 @@ export async function removeVolume(name: string, force = false): Promise<void> {
 }
 
 /**
- * Entfernt ungenutzte Volumes.
+ * Removes unused volumes.
  *
- * `--force` unterdrueckt lediglich Dockers eigene Rueckfrage auf der Konsole;
- * die Rueckfrage an den Nutzer stellt die Oberflaeche.
+ * `--force` merely suppresses Docker's own prompt on the console; the UI is
+ * what asks the user.
  */
 export async function pruneVolumes(): Promise<string> {
     return run(['docker', 'volume', 'prune', '--force']);

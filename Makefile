@@ -90,16 +90,16 @@ $(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type
 watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 	NODE_ENV=$(NODE_ENV) ./build.js --watch
 
-# Unit-Tests der cockpit-freien Client-Module. Baut die *.test.ts mit esbuild
-# nach dist-test/ und laesst sie von node --test laufen; braucht weder Docker
-# noch einen Browser.
+# Unit tests of the cockpit-free client modules. Builds the *.test.ts files
+# with esbuild into dist-test/ and lets node --test run them; needs neither
+# Docker nor a browser.
 test: $(NODE_MODULES_TEST)
 	./build-tests.js
 	cd dist-test && node --test
 
-# Containerisierte Entwicklungsumgebung. Startet Cockpit mit einem EIGENEN
-# Docker-Daemon; dist/ wird eingehaengt, daher genuegt neben `make devenv`
-# ein laufendes `make watch` plus Browser-Reload.
+# Containerised development environment. Starts Cockpit with its OWN Docker
+# daemon; dist/ is mounted, so alongside `make devenv` a running `make watch`
+# plus a browser reload is enough.
 devenv: $(DIST_TEST)
 	test/devenv/devenv up
 

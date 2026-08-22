@@ -1,4 +1,4 @@
-# Normalfall: zwei Services, ein Portmapping, ein benanntes Volume.
+# Normal case: two services, one port mapping, one named volume.
 services:
   web:
     image: busybox

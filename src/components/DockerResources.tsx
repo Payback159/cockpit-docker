@@ -55,9 +55,9 @@ interface ResourceStats {
 }
 
 async function loadStats(): Promise<ResourceStats> {
-    // Nur Zaehlungen: die Uebersicht zeigt Zahlen, keine Details. Ein
-    // listVolumes() waere hier ein zusaetzliches `volume inspect` ueber ALLE
-    // Volumes, dessen Nutzlast sofort verworfen wuerde.
+    // Counts only: the overview shows numbers, not details. A listVolumes()
+    // here would be an extra `volume inspect` over ALL volumes whose payload
+    // would be discarded right away.
     const [info, networks, volumes] = await Promise.all([
         getInfo(),
         countNetworks(),

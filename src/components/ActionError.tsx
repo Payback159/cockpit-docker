@@ -17,11 +17,11 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Einheitliche Anzeige eines fehlgeschlagenen Vorgangs.
+/* Uniform display of a failed operation.
  *
- * Die Spec verlangt eine gemeinsame Darstellung statt neun eigener
- * error-States. Angezeigt wird eine uebersetzte Kurzform als Titel und der
- * Originaltext von Docker als Detail.
+ * The spec calls for one shared presentation instead of nine separate error
+ * states. A translated short form is shown as the title and Docker's original
+ * text as the detail.
  */
 import React from 'react';
 import { InlineNotification } from 'cockpit-components-inline-notification.jsx';

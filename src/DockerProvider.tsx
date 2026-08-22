@@ -17,10 +17,10 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Zentraler Kontext der Docker-Anbindung.
+/* Central context of the Docker integration.
  *
- * Haelt den einmal ermittelten Zugriffsmodus, den modulweiten Fehlerzustand
- * und einen `docker events`-Stream, auf den sich Ansichten abonnieren.
+ * Holds the access mode determined once, the module-wide error state, and a
+ * `docker events` stream that views subscribe to.
  */
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
@@ -31,42 +31,43 @@ import {
     isDockerError, DockerError, type AccessMode, type SystemInfo,
 } from './client';
 
-/* Die Client-Schicht importiert 'superuser' bewusst nicht selbst (sie soll
- * ohne die cockpit-Seitenumgebung testbar bleiben); der Provider ist die
- * Stelle, die den Admin-Zugriff ohnehin beobachtet, und reicht ihn als
- * Funktion hinein. Als Funktion, weil `superuser.allowed` waehrend der
- * Sitzungsinitialisierung `null` ist: ein einmal kopierter Wert waere fast
- * immer `null` und liesse die Eskalation nie zustande kommen. */
+/* The client layer deliberately does not import 'superuser' itself (it is
+ * meant to stay testable without the cockpit page environment); the provider
+ * is the place that watches admin access anyway, and passes it in as a
+ * function. As a function, because `superuser.allowed` is `null` during
+ * session initialisation: a value copied once would almost always be `null`
+ * and would never let the escalation happen. */
 setSuperuserAllowedSource(() => superuser.allowed === true);
 
-/* Gemessen: ein `compose restart` mit zwei Services erzeugt 18 Ereignisse.
- * Ohne Entprellung waere ereignisgesteuertes Nachladen schlechter als das
- * fruehere Polling. */
+/* Measured: a `compose restart` with two services produces 18 events. Without
+ * debouncing, event-driven reloading would be worse than the earlier
+ * polling. */
 const DEBOUNCE_MS = 300;
 
-/* Backoff, bevor nach einem abgerissenen docker-events-Stream neu verbunden
- * wird. Bewusst ereignisgesteuert (ueber den onError-Callback von `stream()`)
- * statt eines blinden Intervalls: ein Intervall, das den Stream unabhaengig
- * von seinem Zustand alle N Sekunden schliesst und neu aufbaut, reisst auch
- * einen gesunden Stream ab und verliert Ereignisse in der Luecke -- das war
- * genau der Fehler, den dieser Umbau beheben soll.
+/* Backoff before reconnecting after a torn-off docker-events stream.
+ * Deliberately event-driven (through the onError callback of `stream()`)
+ * rather than a blind interval: an interval that closes and rebuilds the
+ * stream every N seconds regardless of its state also tears off a healthy
+ * stream and loses events in the gap -- exactly the defect this rework is
+ * meant to fix.
  *
- * Die Wartezeit verdoppelt sich bis zur Obergrenze. Ein fester Wert von 3 s
- * bedeutete bei dauerhaft totem Daemon rund 20 Prozessstarts je Minute, ohne
- * Ende -- also genau die Last, die dieser Umbau beseitigen soll. */
+ * The wait doubles up to the upper bound. A fixed value of 3 s would mean
+ * roughly 20 process starts per minute with a permanently dead daemon,
+ * endlessly -- precisely the load this rework is meant to remove. */
 const RECONNECT_DELAY_MS = 3000;
 const RECONNECT_MAX_DELAY_MS = 60000;
-/* Hielt eine Verbindung so lange, gilt sie als gesund gewesen; der naechste
- * Abbruch faengt wieder unten an. */
+/* If a connection held for this long it counts as having been healthy; the
+ * next tear-off starts at the bottom again. */
 const STREAM_STABLE_MS = 60000;
 
-/* Ein modulweiter Fehler (Docker weg, Daemon tot, Rechte entzogen) beendet
- * jedes Nachladen. Ohne eigenen Versuch bliebe das Modul bis zum Reload tot,
- * auch wenn der Daemon laengst wieder laeuft. Auch hier mit Backoff. */
+/* A module-wide error (Docker gone, daemon dead, rights revoked) stops every
+ * reload. Without a retry of its own the module would stay dead until a page
+ * reload, even long after the daemon is running again. With backoff here
+ * too. */
 const FATAL_RETRY_MIN_MS = 5000;
 const FATAL_RETRY_MAX_MS = 60000;
 
-/* Ursachen, die jeden Tab betreffen (Spec Abschnitt 3). */
+/* Causes that affect every tab (spec section 3). */
 const FATAL_KINDS = ['not-installed', 'daemon-unreachable', 'permission-denied'];
 
 type Listener = { types: string[]; cb: () => void };
@@ -77,9 +78,8 @@ interface DockerContextValue {
     fatalError: DockerError | null;
     systemInfo: SystemInfo | null;
     subscribe: (types: string[], cb: () => void) => () => void;
-    /* Meldet einen Fehler aus einem Ladevorgang. Nur die drei modulweiten
-     * Ursachen werden uebernommen; alles andere bleibt lokal bei der
-     * ausloesenden Ansicht. */
+    /* Reports an error from a load. Only the three module-wide causes are
+     * taken over; everything else stays local to the view that raised it. */
     reportFatal: (err: DockerError) => void;
     activeTab: string | number;
     setActiveTab: (k: string | number) => void;
@@ -90,7 +90,7 @@ const DockerContext = createContext<DockerContextValue | null>(null);
 export function useDockerContext(): DockerContextValue {
     const ctx = useContext(DockerContext);
     if (!ctx)
-        throw new Error('useDockerContext ausserhalb von DockerProvider verwendet');
+        throw new Error('useDockerContext used outside of DockerProvider');
     return ctx;
 }
 
@@ -104,8 +104,8 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const listeners = useRef<Set<Listener>>(new Set());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pending = useRef<Set<string>>(new Set());
-    // Rest einer am Chunk-Rand abgeschnittenen Zeile; cockpit.spawn().stream()
-    // liefert rohe Kanal-Chunks ohne Zeilenrahmung.
+    // Remainder of a line cut off at a chunk boundary; cockpit.spawn().stream()
+    // delivers raw channel chunks without line framing.
     const remainder = useRef('');
 
     const subscribe = useCallback((types: string[], cb: () => void) => {
@@ -127,9 +127,8 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const onEvent = useCallback((chunk: string) => {
-        // Vollstaendige Zeilen sofort verarbeiten; ein abgeschnittenes
-        // Fragment am Ende bleibt fuer den naechsten Chunk stehen, statt
-        // stillschweigend verworfen zu werden.
+        // Process complete lines right away; a truncated fragment at the end
+        // is kept for the next chunk instead of being silently discarded.
         const combined = remainder.current + chunk;
         const lines = combined.split('\n');
         remainder.current = lines.pop() ?? '';
@@ -143,42 +142,41 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 if (evt.Type)
                     pending.current.add(evt.Type);
             } catch (err) {
-                console.warn('DockerProvider: konnte Ereigniszeile nicht parsen', trimmed, err);
+                console.warn('DockerProvider: could not parse event line', trimmed, err);
             }
         }
         if (timer.current === null)
             timer.current = setTimeout(flush, DEBOUNCE_MS);
     }, [flush]);
 
-    /* Setzt den modulweiten Fehler, behaelt aber ein bereits vorhandenes,
-     * gleichlautendes Objekt. Sonst erzeugte jeder erneute Fehlversuch eine
-     * neue Objektidentitaet, was den Wiederholungs-Effekt unten neu startete
-     * und dessen Backoff dauerhaft zuruecksetzte. */
+    /* Sets the module-wide error, but keeps an existing, identical object.
+     * Otherwise every repeated failure would create a new object identity,
+     * which restarted the retry effect below and reset its backoff for
+     * good. */
     const raiseFatal = useCallback((err: DockerError) => {
         setFatalError(prev =>
             (prev !== null && prev.kind === err.kind && prev.raw === err.raw) ? prev : err);
     }, []);
 
-    // Fehler aus einem Ladevorgang: nur die drei modulweiten Ursachen
-    // uebernehmen, alles andere bleibt Sache der ausloesenden Ansicht.
+    // Error from a load: take over only the three module-wide causes,
+    // everything else remains the business of the view that raised it.
     const reportFatal = useCallback((err: DockerError) => {
         if (!FATAL_KINDS.includes(err.kind))
             return;
         raiseFatal(err);
     }, [raiseFatal]);
 
-    // Zugriffsmodus ermitteln; bei Wechsel des Admin-Zugriffs wiederholen.
-    // `silent` fuer den Wiederholungsversuch aus dem Fehlerzustand: dort darf
-    // `ready` nicht kurz auf false fallen, sonst flackerten die Tabs.
+    // Determine the access mode; repeat when admin access changes.
+    // `silent` is for the retry out of the error state: `ready` must not dip
+    // to false there, otherwise the tabs would flicker.
     const probing = useRef(false);
     const reprobeQueued = useRef(false);
     const probeRef = useRef<(opts?: { silent?: boolean }) => void>(() => {});
 
     const probe = useCallback(async (opts: { silent?: boolean } = {}) => {
-        // Zwei gleichzeitige Proben wuerden sich den Modus gegenseitig
-        // ueberschreiben; ein waehrend einer laufenden Probe eintreffendes
-        // Ereignis wird stattdessen vorgemerkt und danach nachgeholt (der
-        // Admin-Zugriff kann sich genau in diesem Fenster geaendert haben).
+        // Two concurrent probes would overwrite each other's mode; an event
+        // arriving while a probe is in flight is noted instead and caught up
+        // afterwards (admin access may have changed in exactly that window).
         if (probing.current) {
             reprobeQueued.current = true;
             return;
@@ -188,33 +186,33 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setReady(false);
         resetAccessMode();
         try {
-            // Ohne superuserAllowed: probeAccess liest den Admin-Zugriff erst
-            // im Moment der Eskalation ueber die vom Provider hinterlegte
-            // Funktion. Ein hier abgelesener Wert waere beim ersten Lauf
-            // praktisch immer `null` (Sitzung noch in Initialisierung) und
-            // verhinderte die Rechteerhoehung dauerhaft.
+            // Without superuserAllowed: probeAccess reads admin access only
+            // at the moment of escalation, through the function the provider
+            // configured. A value read here would be practically always
+            // `null` on the first run (session still initialising) and would
+            // block privilege escalation for good.
             const m = await probeAccess();
             setMode(m);
             setFatalError(null);
             try {
                 setSystemInfo(await checkSystem());
             } catch (err) {
-                // Der Zugriffsmodus steht fest; nur die Zusatzinfo fuer die
-                // Uebersicht blieb aus. Kein Grund, den ganzen Modus zu
-                // verwerfen und den Ereignisstrom zu verhindern -- aber der
-                // Fehler darf nicht wortlos verschwinden.
-                console.error('DockerProvider: checkSystem fehlgeschlagen', err);
+                // The access mode is settled; only the extra info for the
+                // overview did not arrive. No reason to discard the whole
+                // mode and prevent the event stream -- but the error must
+                // not vanish without a word.
+                console.error('DockerProvider: checkSystem failed', err);
                 setSystemInfo(null);
             }
         } catch (err) {
             setMode(null);
-            // Ein nicht klassifizierter Fehler darf den Modul-Zustand nicht
-            // unbeobachtet lassen (ready=true, fatalError=null wuerde jeden
-            // Tab freischalten, obwohl der Zugriff nie geklaert wurde).
+            // An unclassified error must not leave the module state
+            // unobserved (ready=true, fatalError=null would unlock every tab
+            // even though access was never established).
             if (isDockerError(err)) {
                 raiseFatal(err);
             } else {
-                console.error('DockerProvider: unerwarteter Fehler bei probeAccess', err);
+                console.error('DockerProvider: unexpected error in probeAccess', err);
                 const message = err instanceof Error ? err.message : String(err);
                 raiseFatal(new DockerError('command-failed', message, null));
             }
@@ -230,9 +228,8 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     probeRef.current = probe;
 
-    // Der Wach-Zustand fuer die Ereignis-Handler unten: sie leben ueber die
-    // gesamte Sitzung und duerfen keinen Zustand aus ihrer Aufbau-Runde
-    // einfrieren.
+    // The live state for the event handlers below: they live for the whole
+    // session and must not freeze state from the render that created them.
     const modeRef = useRef(mode);
     modeRef.current = mode;
     const fatalRef = useRef(fatalError);
@@ -241,19 +238,18 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     useEffect(() => {
         probe();
 
-        /* Auf BEIDE Ereignisse hoeren.
+        /* Listen for BOTH events.
          *
-         * `reconnect` allein genuegt nicht: pkg/lib/superuser.js sendet es
-         * nur, wenn vorher schon ein Wert bekannt war (`if (prev != null)`).
-         * Der Uebergang null -> true, der bei jedem Seitenaufbau stattfindet
-         * und der fuer Lage 2 (Administrator ohne Gruppe docker) der
-         * entscheidende ist, meldet sich ausschliesslich ueber `changed`.
+         * `reconnect` alone is not enough: pkg/lib/superuser.js only sends it
+         * when a value was already known (`if (prev != null)`). The
+         * null -> true transition, which happens on every page load and is the
+         * decisive one for situation 2 (administrator without the docker
+         * group), announces itself exclusively through `changed`.
          *
-         * Neu geprobt wird nur, wenn es etwas aendern kann: solange kein
-         * Modus feststeht oder ein modulweiter Fehler ansteht. Ein
-         * funktionierendes Modul wird von wiederholten `changed`-Ereignissen
-         * nicht angeruehrt -- sonst starteten Rechtewechsel eine Kette von
-         * Proben. */
+         * A re-probe only happens when it can change something: while no mode
+         * is settled or a module-wide error is pending. A working module is
+         * left untouched by repeated `changed` events -- otherwise privilege
+         * changes would start a chain of probes. */
         const onSuperuserChange = () => {
             if (modeRef.current === null || fatalRef.current !== null)
                 probe();
@@ -266,11 +262,11 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, [probe]);
 
-    /* Wiederholung aus dem modulweiten Fehlerzustand.
+    /* Retry out of the module-wide error state.
      *
-     * Im Fehlerzustand laedt keine Ansicht mehr nach (useDockerResource ist
-     * darauf gestuetzt) und der Ereignisstrom ruht. Ohne diesen Versuch
-     * bliebe das Modul nach einem Daemon-Neustart bis zum Reload tot. */
+     * In the error state no view reloads any more (useDockerResource relies on
+     * that) and the event stream is idle. Without this retry the module would
+     * stay dead after a daemon restart until a page reload. */
     useEffect(() => {
         if (fatalError === null)
             return;
@@ -300,7 +296,7 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, [fatalError, probe]);
 
-    // Ereignis-Stream, solange der Zugriff steht.
+    // Event stream, for as long as access holds.
     useEffect(() => {
         if (!ready || fatalError || mode === null)
             return;
@@ -317,28 +313,27 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             handle = stream(['docker', 'events', '--format', 'json'], onEvent, onStreamError);
         }
 
-        // Der Stream endet nie von selbst; ein Abbruch (Daemon-Neustart,
-        // entzogene Rechte, unterbrochene Verbindung) laeuft immer hier
-        // auf -- nie stillschweigend verwerfen, sondern melden und mit
-        // kurzem Backoff neu verbinden.
+        // The stream never ends on its own; a tear-off (daemon restart,
+        // revoked rights, interrupted connection) always lands here -- never
+        // discard it silently, report it and reconnect with a short backoff.
         function onStreamError(err: DockerError) {
             if (closed)
                 return;
 
-            // Ein modulweiter Grund (Daemon tot, Docker weg, Rechte entzogen)
-            // gehoert ins Banner statt in eine endlose Wiederverbindung; der
-            // Fehlerzustand baut diesen Effekt ohnehin ab.
+            // A module-wide cause (daemon dead, Docker gone, rights revoked)
+            // belongs in the banner rather than in an endless reconnect; the
+            // error state tears this effect down anyway.
             reportFatal(err);
 
-            // Hat die Verbindung lange genug gehalten, war sie gesund: der
-            // naechste Abbruch faengt wieder bei der kurzen Wartezeit an.
+            // If the connection held long enough it was healthy: the next
+            // tear-off starts at the short wait again.
             if (Date.now() - connectedAt >= STREAM_STABLE_MS)
                 delay = RECONNECT_DELAY_MS;
 
             const wait = delay;
             delay = Math.min(delay * 2, RECONNECT_MAX_DELAY_MS);
-            console.warn('DockerProvider: docker-events-Stream abgebrochen, verbinde in',
-                         wait, 'ms neu', err);
+            console.warn('DockerProvider: docker-events stream torn off, reconnecting in',
+                         wait, 'ms', err);
             reconnectTimer = setTimeout(() => {
                 reconnectTimer = null;
                 if (!closed)
@@ -348,9 +343,9 @@ export const DockerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         connect();
 
-        // Die Menge wird nie ersetzt, nur veraendert -- die Referenz hier
-        // festzuhalten ist daher gleichbedeutend und erfuellt die
-        // Hooks-Regel, die einen ref-Zugriff im Cleanup beanstandet.
+        // The set is never replaced, only mutated -- capturing the reference
+        // here is therefore equivalent and satisfies the hooks rule that
+        // objects to a ref access in the cleanup.
         const pendingTypes = pending.current;
 
         return () => {

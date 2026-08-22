@@ -17,7 +17,7 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Container: auflisten, steuern, Logs. */
+/* Containers: list, control, logs. */
 import { run, stream } from './spawn';
 import { parseJsonList, parseLabels } from './parse';
 import type { DockerError } from './errors';

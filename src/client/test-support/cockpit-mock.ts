@@ -1,7 +1,7 @@
-/* Test-Double fuer das cockpit-Modul.
+/* Test double for the cockpit module.
  *
- * build-tests.js biegt Importe von 'cockpit' per esbuild-alias hierher um.
- * Die Tests steuern das Verhalten ueber setSpawnHandler().
+ * build-tests.js redirects imports of 'cockpit' here via an esbuild alias.
+ * The tests drive the behaviour through setSpawnHandler().
  */
 
 export interface FakeSpawnCall {
@@ -48,13 +48,13 @@ function fakeSpawn(args: string[], options: Record<string, unknown> = {}) {
     calls.push(call);
 
     const promise = Promise.resolve().then(() => handler(call));
-    // cockpit.spawn liefert ein Promise mit Zusatzmethoden.
+    // cockpit.spawn returns a promise with extra methods.
     return Object.assign(promise, {
         stream(cb: (data: string) => void) {
             promise.then(out => cb(out)).catch(() => undefined);
             return promise;
         },
-        close() { /* im Test ohne Wirkung */ },
+        close() { /* no effect in tests */ },
         input() { return promise },
     });
 }

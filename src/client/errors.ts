@@ -17,13 +17,13 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Fehlerklassifizierung fuer Docker-Kommandos.
+/* Error classification for Docker commands.
  *
- * Dieses Modul importiert bewusst KEIN cockpit (siehe parse.ts).
+ * This module deliberately imports NO cockpit (see parse.ts).
  *
- * Zwei Signalquellen: das `problem` des cockpit-Kanals (etwa 'not-found',
- * wenn das Binary fehlt) und der stderr-Text von Docker. Alle Docker-Fehler
- * liefern exit=1, unterscheidbar sind sie ausschliesslich am Text.
+ * Two signal sources: the cockpit channel's `problem` ('not-found', say, when
+ * the binary is missing) and Docker's stderr text. All Docker errors exit with
+ * status 1, so the text is the only thing that tells them apart.
  */
 
 export type DockerErrorKind =
@@ -51,11 +51,10 @@ export function isDockerError(e: unknown): e is DockerError {
     return e instanceof DockerError;
 }
 
-/* Gemessene stderr-Muster. Ueber alle gemessenen Meldungen sind sie disjunkt
- * -- keine Meldung trifft auf zwei Muster zu, die Reihenfolge ist daher ohne
- * Wirkung. Das erste passende Muster gewinnt; kaeme spaeter ein Muster hinzu,
- * das eine bereits abgedeckte Meldung ebenfalls trifft, muesste die
- * Reihenfolge erneut bedacht werden. */
+/* Measured stderr patterns. They are disjoint across every message we
+ * measured -- no message matches two patterns, so the order has no effect.
+ * The first matching pattern wins; if a pattern were added later that also
+ * matched an already covered message, the order would need reconsidering. */
 const PATTERNS: ReadonlyArray<[RegExp, DockerErrorKind]> = [
     [/permission denied while trying to connect/i, 'permission-denied'],
     [/failed to connect to the docker api/i, 'daemon-unreachable'],
@@ -68,7 +67,7 @@ export function classifyError(
     message: string,
     exitStatus: number | null
 ): DockerError {
-    // Die Kanal-Ebene ist eindeutiger als der Text und hat deshalb Vorrang.
+    // The channel layer is less ambiguous than the text, so it takes priority.
     if (problem === 'not-found')
         return new DockerError('not-installed', message, exitStatus);
     if (problem === 'access-denied')

@@ -1,27 +1,27 @@
-# Test- und Entwicklungsumgebung fuer cockpit-docker.
+# Test and development environment for cockpit-docker.
 #
-# systemd laeuft als PID 1, damit cockpit.socket und docker.service so starten
-# wie auf einem echten Server. Der Container braucht --privileged, weil er
-# einen EIGENEN Docker-Daemon betreibt (Docker-in-Docker) statt den Socket des
-# Hosts einzuhaengen -- sonst wuerden Aktionen wie "Prune" oder "Down" echte
-# Daten des Hosts loeschen.
+# systemd runs as PID 1 so that cockpit.socket and docker.service start the way
+# they do on a real server. The container needs --privileged because it runs
+# its OWN Docker daemon (Docker-in-Docker) instead of mounting the host's
+# socket -- otherwise actions like "Prune" or "Down" would delete real data on
+# the host.
 ARG BASE=ubuntu:26.04
 FROM ${BASE}
 
-# distro     = docker.io + docker-compose-v2 aus der Distribution
-# docker.com = docker-ce + docker-compose-plugin aus dem offiziellen Repo
+# distro     = docker.io + docker-compose-v2 from the distribution
+# docker.com = docker-ce + docker-compose-plugin from the official repo
 ARG DOCKER_SOURCE=distro
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV container=docker
 
-# Zum Paketblock unten -- beides sieht auf Ubuntu redundant aus, ist auf Debian
-# aber noetig; bitte nicht "aufraeumen":
-#   docker-cli: docker.io *empfiehlt* es nur, und --no-install-recommends wirft
-#   Empfehlungen weg, also braucht Debian es explizit. Auf Ubuntu ist docker-cli
-#   ein von docker.io bereitgestelltes virtuelles Paket -- die Angabe ist ein No-op.
-#   Compose-Kaskade: Ubuntu 26.04 kennt nur docker-compose-v2, Debian 13 nur
-#   docker-compose; docker-compose-plugin deckt weitere Distributionen ab.
+# On the package block below -- both look redundant on Ubuntu but are needed on
+# Debian; please do not "clean this up":
+#   docker-cli: docker.io only *recommends* it, and --no-install-recommends
+#   throws recommendations away, so Debian needs it explicitly. On Ubuntu
+#   docker-cli is a virtual package provided by docker.io -- naming it is a no-op.
+#   Compose cascade: Ubuntu 26.04 only knows docker-compose-v2, Debian 13 only
+#   docker-compose; docker-compose-plugin covers further distributions.
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
         systemd systemd-sysv dbus \
@@ -47,19 +47,19 @@ RUN apt-get update -qq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Zwei Nutzer fuer die zwei Zugriffslagen der Client-Schicht:
-#   devel: in Gruppe docker  -> erreicht Docker OHNE Rechteerhoehung
-#   admin: nur in sudo       -> braucht superuser, loest "permission denied" aus
+# Two users for the two access situations of the client layer:
+#   devel: in group docker  -> reaches Docker WITHOUT escalation
+#   admin: only in sudo     -> needs superuser, triggers "permission denied"
 RUN useradd -m -s /bin/bash -G sudo,docker devel \
     && echo 'devel:devel' | chpasswd \
     && useradd -m -s /bin/bash -G sudo admin \
     && echo 'admin:admin' | chpasswd
 
-# Kein TLS: der Zugriff erfolgt ausschliesslich ueber 127.0.0.1.
+# No TLS: access happens exclusively over 127.0.0.1.
 RUN mkdir -p /etc/cockpit \
     && printf '[WebService]\nAllowUnencrypted=true\n' > /etc/cockpit/cockpit.conf
 
-# Dienste, die im Container nicht laufen koennen und sonst "degraded" erzeugen.
+# Services that cannot run in the container and would otherwise cause "degraded".
 RUN systemctl mask systemd-udevd systemd-udev-trigger systemd-modules-load \
         systemd-networkd-wait-online e2scrub_reap getty@tty1 \
         getty.target console-getty 2>/dev/null || true

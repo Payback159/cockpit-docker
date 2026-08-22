@@ -78,11 +78,11 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                         }, 0);
                     },
                     (streamErr: DockerError) => {
-                        // Der Stream ist bereits beendet, wenn dieser Callback
-                        // feuert -- ohne diese Meldung wuerde ein abgerissenes
-                        // `docker logs -f` (z.B. Container entfernt) im
-                        // Hintergrund verschwinden, ohne dass die Anzeige es
-                        // zeigt.
+                        // The stream has already ended when this callback
+                        // fires -- without this message a torn-off
+                        // `docker logs -f` (container removed, say) would
+                        // vanish in the background without the display
+                        // showing it.
                         console.error('Failed to follow logs:', streamErr);
                         setLogs(prev => prev + '\n' + _("Error following logs: ") + streamErr.message);
                         isFollowingRef.current = false;
@@ -223,7 +223,7 @@ export const ContainerLogs: React.FC<ContainerLogsProps> = ({ containerName, isO
                 </CodeBlock>
             </div>
 
-            {/* Footer mit Buttons */}
+            {/* Footer with buttons */}
             <div
                 style={{
                     display: 'flex',

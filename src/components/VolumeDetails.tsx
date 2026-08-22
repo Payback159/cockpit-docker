@@ -138,7 +138,7 @@ export const VolumeDetails: React.FC<VolumeDetailsProps> = ({
                 </DescriptionList>
             </div>
 
-            {/* Footer mit Button */}
+            {/* Footer with button */}
             <div
                 style={{
                     display: 'flex',

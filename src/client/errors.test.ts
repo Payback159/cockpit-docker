@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 
 import { classifyError, DockerError, isDockerError } from './errors';
 
-// Alle Docker-Fehler liefern exit=1; unterscheidbar sind sie nur am
-// stderr-Text. Die folgenden Muster wurden real gemessen (siehe Anhang der
-// Spec), nicht angenommen.
+// All Docker errors exit with status 1; the stderr text is the only thing
+// that tells them apart. The patterns below were measured for real (see the
+// spec's appendix), not assumed.
 
-test('fehlendes Binary wird ueber das cockpit-problem erkannt', () => {
+test('a missing binary is recognised through the cockpit problem', () => {
     const e = classifyError('not-found', 'docker: command not found', null);
     assert.equal(e.kind, 'not-installed');
 });
 
-test('access-denied vom cockpit-Kanal wird erkannt', () => {
-    const e = classifyError('access-denied', 'nicht erlaubt', null);
+test('access-denied from the cockpit channel is recognised', () => {
+    const e = classifyError('access-denied', 'not permitted', null);
     assert.equal(e.kind, 'permission-denied');
 });
 
-test('nicht erreichbarer Daemon wird am stderr-Text erkannt', () => {
+test('an unreachable daemon is recognised from the stderr text', () => {
     const e = classifyError(
         null,
         'failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running',
@@ -25,7 +25,7 @@ test('nicht erreichbarer Daemon wird am stderr-Text erkannt', () => {
     assert.equal(e.kind, 'daemon-unreachable');
 });
 
-test('fehlende Berechtigung wird am stderr-Text erkannt', () => {
+test('a missing permission is recognised from the stderr text', () => {
     const e = classifyError(
         null,
         'permission denied while trying to connect to the docker API at unix:///var/run/docker.sock',
@@ -33,38 +33,38 @@ test('fehlende Berechtigung wird am stderr-Text erkannt', () => {
     assert.equal(e.kind, 'permission-denied');
 });
 
-test('nicht gefundenes Volume wird erkannt', () => {
+test('a volume that was not found is recognised', () => {
     const e = classifyError(null, 'Error response from daemon: get x: no such volume', 1);
     assert.equal(e.kind, 'not-found');
 });
 
-test('nicht gefundenes Objekt wird erkannt', () => {
+test('an object that was not found is recognised', () => {
     const e = classifyError(null, 'error: no such object: x', 1);
     assert.equal(e.kind, 'not-found');
 });
 
-test('nicht gefundener Container wird erkannt, auch mit grossem N', () => {
+test('a container that was not found is recognised, capital N included', () => {
     const e = classifyError(null, 'Error response from daemon: No such container: x', 1);
     assert.equal(e.kind, 'not-found');
 });
 
-test('unbekannter Fehler bleibt command-failed', () => {
+test('an unknown error stays command-failed', () => {
     const e = classifyError(null, 'Error response from daemon: invalid reference format', 1);
     assert.equal(e.kind, 'command-failed');
 });
 
-test('der Originaltext bleibt in raw erhalten', () => {
-    const text = 'Error response from daemon: irgendwas';
+test('the original text is preserved in raw', () => {
+    const text = 'Error response from daemon: something';
     const e = classifyError(null, text, 1);
     assert.equal(e.raw, text);
 });
 
-test('der exit-Status wird uebernommen', () => {
+test('the exit status is carried over', () => {
     const e = classifyError(null, 'x', 1);
     assert.equal(e.exitStatus, 1);
 });
 
-test('DockerError ist ein Error und ueber isDockerError erkennbar', () => {
+test('DockerError is an Error and recognisable through isDockerError', () => {
     const e = classifyError(null, 'x', 1);
     assert.ok(e instanceof Error);
     assert.ok(e instanceof DockerError);
@@ -73,16 +73,16 @@ test('DockerError ist ein Error und ueber isDockerError erkennbar', () => {
     assert.ok(!isDockerError(null));
 });
 
-test('die Klassifizierung ist gegen Gross- und Kleinschreibung robust', () => {
+test('the classification is robust against upper and lower case', () => {
     const a = classifyError(null, 'PERMISSION DENIED WHILE TRYING TO CONNECT to the docker API', 1);
     assert.equal(a.kind, 'permission-denied');
     const b = classifyError(null, 'Failed To Connect To The Docker API at unix://x', 1);
     assert.equal(b.kind, 'daemon-unreachable');
 });
 
-test('das cockpit-problem hat Vorrang vor dem Text', () => {
-    // Wenn der Kanal schon sagt, dass das Binary fehlt, ist der stderr-Text
-    // nachrangig.
+test('the cockpit problem takes priority over the text', () => {
+    // If the channel already says the binary is missing, the stderr text is
+    // secondary.
     const e = classifyError('not-found', 'no such container: x', null);
     assert.equal(e.kind, 'not-installed');
 });

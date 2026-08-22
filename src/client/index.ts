@@ -17,8 +17,8 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Oeffentliche Schnittstelle der Client-Schicht.
- * Komponenten importieren aus './client', nicht aus den Einzelmodulen. */
+/* Public interface of the client layer.
+ * Components import from './client', not from the individual modules. */
 export * from './types';
 export { DockerError, isDockerError } from './errors';
 export type { DockerErrorKind } from './errors';

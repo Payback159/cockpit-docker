@@ -1,0 +1,68 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit (node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      # A break on 20 must not hide the result on 24, and vice versa.
+      fail-fast: false
+      matrix:
+        node-version: ['20', '24']
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # Needs neither Docker nor a browser: build-tests.js bundles the client
+      # tests and aliases 'cockpit' to a test double.
+      - name: Run unit tests
+        run: make test
+
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # test/common/static-code gates its eslint and stylelint checks on
+      # `test -x node_modules/.bin/eslint -a -x /usr/bin/node`. Where
+      # setup-node puts node is not guaranteed to be /usr/bin/node, and when
+      # it is not, both checks are skipped and `make codecheck` still exits 0.
+      - name: Make node available at /usr/bin/node
+        run: sudo ln -sfn "$(command -v node)" /usr/bin/node
+
+      # A broken bundle passes every unit test, because the unit tests are
+      # bundled separately by build-tests.js.
+      - name: Build
+        run: make
+
+      - name: Static code checks
+        run: |
+          # Without pipefail, tee would mask a failing make.
+          set -o pipefail
+          make codecheck 2>&1 | tee codecheck.log
+          # Guard: mypy/vulture/ruff may skip (no Python here), eslint and
+          # stylelint may not.
+          if grep -qE 'skipping /static-code/test-(eslint|stylelint)' codecheck.log; then
+              echo "::error::static-code skipped eslint or stylelint - they did not run"
+              exit 1
+          fi

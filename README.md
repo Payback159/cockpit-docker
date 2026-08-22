@@ -298,3 +298,30 @@ see [configuration file](.github/dependabot.yml).
    blog post explains the rationale for this project.
  * [Cockpit Deployment and Developer documentation](https://cockpit-project.org/guide/latest/)
  * [Make your project easily discoverable](https://cockpit-project.org/blog/making-a-cockpit-application.html)
+
+# Running the tests
+
+Unit tests for the Docker client layer. They need neither Docker nor a
+browser:
+
+    make test
+
+Static checks — eslint, stylelint, TypeScript, and Cockpit's own tree checks:
+
+    make codecheck
+
+**Careful:** `make codecheck` skips eslint and stylelint unless `/usr/bin/node`
+exists. `test/common/static-code` gates both on that exact path, so if you run
+Node from nvm or another version manager the two checks are silently skipped
+and the command still exits 0. Either create the symlink once:
+
+    sudo ln -sfn "$(command -v node)" /usr/bin/node
+
+or run the linters directly:
+
+    npm run eslint
+    npm run stylelint
+
+CI runs `make test` on Node 20 and 24 and `make codecheck` on every pull
+request, and fails if either linter is skipped — see
+`.github/workflows/test.yml`.
